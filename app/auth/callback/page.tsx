@@ -12,27 +12,31 @@ export default function AuthCallbackPage() {
     const supabase = createClient()
 
     async function handleCallback() {
-      // PKCE flow: code in query params
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
-
+      // 1. PKCE flow — code in query params
+      const code = new URLSearchParams(window.location.search).get('code')
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) {
-          router.replace('/update-password')
-          return
-        }
+        if (!error) { router.replace('/update-password'); return }
       }
 
-      // Implicit flow: tokens in hash fragment — getSession processes it automatically
+      // 2. Implicit flow — tokens in hash fragment (#access_token=...&refresh_token=...)
+      const hash = window.location.hash.substring(1)
+      const hashParams = new URLSearchParams(hash)
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+
+      if (accessToken && refreshToken) {
+        const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        if (!error) { router.replace('/update-password'); return }
+      }
+
+      // 3. Session may already exist (page refresh)
       const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        router.replace('/update-password')
-        return
-      }
+      if (session) { router.replace('/update-password'); return }
 
-      setMessage('Link expired or invalid. Redirecting…')
-      setTimeout(() => router.replace('/login?error=invite_expired'), 2000)
+      // Nothing worked — link is expired or already used
+      setMessage('Link expired or already used. Redirecting to sign in…')
+      setTimeout(() => router.replace('/login'), 2500)
     }
 
     handleCallback()
