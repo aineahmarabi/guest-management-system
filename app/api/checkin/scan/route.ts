@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { Guest } from '@/types/supabase'
+import { Guest, Event } from '@/types/supabase'
+import { sendEmail, buildCheckinConfirmationHtml } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,6 +55,38 @@ export async function POST(request: NextRequest) {
     if (updateError) {
       return NextResponse.json({ status: 'invalid', message: 'Check-in failed, please try again' })
     }
+
+    // Fire confirmation email in background — don't block the check-in response
+    supabase
+      .from('events')
+      .select('*')
+      .eq('id', guest.event_id)
+      .single()
+      .then(({ data: eventData }) => {
+        if (!eventData) return
+        const event = eventData as Event
+        const formattedDate = new Date(event.event_date).toLocaleDateString('en-KE', {
+          weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+        })
+        const formattedTime = new Date(checkedInAt).toLocaleTimeString('en-KE', {
+          hour: '2-digit', minute: '2-digit',
+        })
+        const html = buildCheckinConfirmationHtml({
+          guestName: guest.full_name,
+          eventName: event.name,
+          eventDate: formattedDate,
+          eventTime: event.event_time,
+          venue: event.venue,
+          checkedInAt: formattedTime,
+          escortCount: guest.escort_count,
+        })
+        sendEmail({
+          to: guest.email,
+          toName: guest.full_name,
+          subject: `Attendance Confirmed — ${event.name}`,
+          html,
+        }).catch(() => {})
+      })
 
     return NextResponse.json({
       status: 'success',
