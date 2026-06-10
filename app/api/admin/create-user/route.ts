@@ -40,7 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       email,
       options: {
         data: { full_name },
-        redirectTo: `${appUrl}/auth/callback?next=/update-password`,
+        redirectTo: `${appUrl}/auth/callback`,
       },
     })
 
