@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { Profile } from '@/types/supabase'
 import UserManagement from './UserManagement'
 import OrgSettingsForm from './OrgSettingsForm'
+import ProfileForm from './ProfileForm'
 
 const ORG_DEFAULTS = {
   company_name: 'Dualpix Communications Ltd',
@@ -23,41 +24,53 @@ export default async function SettingsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: profileData } = await (admin as any)
     .from('profiles')
-    .select('role')
+    .select('*')
     .eq('id', user.id)
     .single()
 
-  const profile = profileData as { role: string } | null
-  if (profile?.role !== 'super_admin') redirect('/dashboard')
+  const profile = profileData as Profile | null
+  const isSuperAdmin = profile?.role === 'super_admin'
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: usersData } = await (admin as any)
-    .from('profiles')
-    .select('*')
-    .order('created_at', { ascending: true })
-
-  const users = (usersData ?? []) as Profile[]
-
-  // Fetch org settings — fall back to defaults if table doesn't exist yet
+  let users: Profile[] = []
   let orgSettings = ORG_DEFAULTS
-  try {
+
+  if (isSuperAdmin) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: orgData } = await (admin as any).from('org_settings').select('*').single()
-    if (orgData) orgSettings = { ...ORG_DEFAULTS, ...orgData }
-  } catch {
-    // table not yet created — use defaults
+    const { data: usersData } = await (admin as any)
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: true })
+    users = (usersData ?? []) as Profile[]
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: orgData } = await (admin as any).from('org_settings').select('*').single()
+      if (orgData) orgSettings = { ...ORG_DEFAULTS, ...orgData }
+    } catch {
+      // table not yet created — use defaults
+    }
   }
 
   return (
     <div className="p-4 md:p-8">
       <div className="mb-6 md:mb-8">
         <h1 className="text-white text-xl md:text-2xl font-semibold">Settings</h1>
-        <p className="text-[#9CA3AF] text-sm mt-1">Super admin controls</p>
+        <p className="text-[#9CA3AF] text-sm mt-1">
+          {isSuperAdmin ? 'Super admin controls' : 'Manage your profile'}
+        </p>
       </div>
 
-      <OrgSettingsForm initial={orgSettings} />
+      <ProfileForm
+        initialName={profile?.full_name ?? ''}
+        email={profile?.email ?? user.email ?? ''}
+      />
 
-      <UserManagement users={users} currentUserId={user.id} />
+      {isSuperAdmin && (
+        <>
+          <OrgSettingsForm initial={orgSettings} />
+          <UserManagement users={users} currentUserId={user.id} />
+        </>
+      )}
     </div>
   )
 }

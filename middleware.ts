@@ -34,7 +34,8 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/events') ||
     pathname.startsWith('/reports') ||
     pathname.startsWith('/settings') ||
-    pathname.startsWith('/checkin')
+    pathname.startsWith('/checkin') ||
+    pathname.startsWith('/update-password')
   ) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))

@@ -35,12 +35,6 @@ export default async function DashboardPage() {
     .order('event_date', { ascending: true })
     .limit(5)
 
-  if (isEventManager && user) {
-    totalEventsQuery = totalEventsQuery.eq('created_by', user.id)
-    eventsThisMonthQuery = eventsThisMonthQuery.eq('created_by', user.id)
-    upcomingEventsQuery = upcomingEventsQuery.eq('created_by', user.id)
-  }
-
   const [
     totalEventsRes,
     eventsThisMonthRes,
@@ -87,14 +81,14 @@ export default async function DashboardPage() {
           Welcome back, {welcomeName}
         </h1>
         <p className="text-[#9CA3AF] text-sm mt-1">
-          {isEventManager ? 'Overview of your events' : 'Overview of all events and guests'}
+          Overview of all events and guests
         </p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         {[
-          { label: isEventManager ? 'Your Events' : 'Total Events', value: totalEvents },
+          { label: 'Total Events', value: totalEvents },
           { label: 'Events This Month', value: eventsThisMonth },
           { label: 'Total Guests', value: totalGuests },
           { label: 'Avg Attendance', value: `${attendanceRate}%` },

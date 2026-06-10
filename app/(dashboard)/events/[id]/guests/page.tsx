@@ -3,6 +3,7 @@ import { Guest } from '@/types/supabase'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import GuestActions from './GuestActions'
+import GuestListControls from './GuestListControls'
 
 export default async function GuestListPage({ params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -40,12 +41,7 @@ export default async function GuestListPage({ params }: { params: { id: string }
           <h1 className="text-white text-2xl font-semibold">Guest List</h1>
           <p className="text-[#9CA3AF] text-sm mt-1">{guests.length} guests for {event.name}</p>
         </div>
-        <Link
-          href={`/events/${params.id}/guests/new`}
-          className="bg-[#800000] hover:bg-[#6B0000] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors"
-        >
-          + Add Guest
-        </Link>
+        <GuestListControls eventId={params.id} />
       </div>
 
       <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] overflow-hidden">

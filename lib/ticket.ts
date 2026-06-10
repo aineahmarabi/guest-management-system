@@ -1,5 +1,7 @@
-export function generateTicketId(eventId: string, guestNumber: number): string {
+export function generateTicketId(eventId: string): string {
   const eventCode = eventId.replace(/-/g, '').substring(0, 6).toUpperCase()
-  const guestNum = String(guestNumber).padStart(4, '0')
-  return `DPX-${eventCode}-G${guestNum}`
+  // Unambiguous chars — no 0/O, 1/I/L confusion under stress
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  const random = Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+  return `DPX-${eventCode}-${random}`
 }

@@ -31,11 +31,6 @@ export default async function EventsPage({
     .select(`*, guests(count)`)
     .order('event_date', { ascending: false })
 
-  // Event managers only see their own events
-  if (isEventManager && user) {
-    query = query.eq('created_by', user.id)
-  }
-
   if (searchParams.status && searchParams.status !== 'all') {
     query = query.eq('status', searchParams.status)
   }
@@ -59,7 +54,7 @@ export default async function EventsPage({
         <div>
           <h1 className="text-white text-2xl font-semibold">Events</h1>
           <p className="text-[#9CA3AF] text-sm mt-1">
-            {isEventManager ? `${events.length} of your events` : `${events.length} events total`}
+            {events.length} events total
           </p>
         </div>
         <Link

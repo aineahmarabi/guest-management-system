@@ -68,13 +68,7 @@ export default function NewGuestPage() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { count } = await supabase
-      .from('guests')
-      .select('*', { count: 'exact', head: true })
-      .eq('event_id', eventId)
-
-    const nextNumber = (count ?? 0) + 1
-    const ticketId = generateTicketId(eventId, nextNumber)
+    const ticketId = generateTicketId(eventId)
 
     const { data: guest, error: guestError } = await db
       .from('guests')
@@ -105,6 +99,13 @@ export default function NewGuestPage() {
         }))
       )
     }
+
+    // Auto-send ticket email (fire and forget — guest list has Resend if it fails)
+    fetch('/api/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guestId: guest.id }),
+    }).catch(() => {})
 
     router.push(`/events/${eventId}/guests`)
   }

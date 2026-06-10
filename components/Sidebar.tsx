@@ -142,27 +142,25 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             </Link>
           ))}
 
-          {profile.role === 'super_admin' && (
-            <>
-              <div className="pt-4 pb-1 px-3">
-                <span className="text-[#4B5563] text-xs font-medium uppercase tracking-wider">Admin</span>
-              </div>
-              {adminItems.map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${
-                    isActive(item.href)
-                      ? 'bg-[#800000] text-white'
-                      : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'
-                  }`}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              ))}
-            </>
-          )}
+          <div className="pt-4 pb-1 px-3">
+            <span className="text-[#4B5563] text-xs font-medium uppercase tracking-wider">
+              {profile.role === 'super_admin' ? 'Admin' : 'Account'}
+            </span>
+          </div>
+          {adminItems.map(item => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${
+                isActive(item.href)
+                  ? 'bg-[#800000] text-white'
+                  : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
       </aside>
@@ -209,17 +207,15 @@ export default function Sidebar({ profile }: { profile: Profile }) {
           <span className="text-[10px] font-medium">Reports</span>
         </Link>
 
-        {/* Settings — super_admin only */}
-        {profile.role === 'super_admin' && (
-          <Link
-            href="/settings"
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-            style={{ color: isActive('/settings') ? '#800000' : '#9CA3AF' }}
-          >
-            {adminItems[0].mobileIcon}
-            <span className="text-[10px] font-medium">Settings</span>
-          </Link>
-        )}
+        {/* Settings — all users */}
+        <Link
+          href="/settings"
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
+          style={{ color: isActive('/settings') ? '#800000' : '#9CA3AF' }}
+        >
+          {adminItems[0].mobileIcon}
+          <span className="text-[10px] font-medium">Settings</span>
+        </Link>
       </nav>
     </>
   )
