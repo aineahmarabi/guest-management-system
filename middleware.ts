@@ -35,6 +35,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/reports') ||
     pathname.startsWith('/settings') ||
     pathname.startsWith('/checkin') ||
+    pathname.startsWith('/scan') ||
     pathname.startsWith('/update-password')
   ) {
     if (!user) {

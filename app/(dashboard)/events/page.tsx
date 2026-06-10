@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { Event } from '@/types/supabase'
 import Link from 'next/link'
 
@@ -11,20 +10,6 @@ export default async function EventsPage({
   const supabase = createClient()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Fetch profile to determine role
-  const admin = createAdminClient()
-  const { data: profileData } = await admin
-    .from('profiles')
-    .select('role')
-    .eq('id', user?.id ?? '')
-    .single()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profile = profileData as any
-  const isEventManager = profile?.role === 'event_manager'
 
   let query = db
     .from('events')

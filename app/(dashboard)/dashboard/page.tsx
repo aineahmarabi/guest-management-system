@@ -20,15 +20,13 @@ export default async function DashboardPage() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const profile = profileData as any
-  const isEventManager = profile?.role === 'event_manager'
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  // Base queries — event managers see only their events
-  let totalEventsQuery = db.from('events').select('*', { count: 'exact', head: true })
-  let eventsThisMonthQuery = db.from('events').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth)
-  let upcomingEventsQuery = db
+  const totalEventsQuery = db.from('events').select('*', { count: 'exact', head: true })
+  const eventsThisMonthQuery = db.from('events').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth)
+  const upcomingEventsQuery = db
     .from('events')
     .select('id, name, venue, event_date, event_time, status')
     .gte('event_date', now.toISOString().split('T')[0])

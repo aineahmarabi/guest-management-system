@@ -138,8 +138,9 @@ export async function generateTicketPDF(data: TicketData): Promise<Uint8Array> {
   })
   yPos -= 30
 
-  // QR Code — generate as PNG then embed
-  const qrDataUrl = await QRCode.toDataURL(data.ticketId, {
+  // QR Code — encode a URL so phone cameras open the check-in page directly
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://dualpix-gms.vercel.app'
+  const qrDataUrl = await QRCode.toDataURL(`${appUrl}/scan/${data.ticketId}`, {
     width: 200,
     margin: 1,
     errorCorrectionLevel: 'M',
