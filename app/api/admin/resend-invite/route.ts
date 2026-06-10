@@ -36,7 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!targetProfile) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
     const { full_name, email, role } = targetProfile as { full_name: string; email: string; role: string }
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3001'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host')}`
 
     // Generate a recovery link — lets the user set/reset their password
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
