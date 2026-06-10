@@ -42,7 +42,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'recovery',
       email,
-      options: { redirectTo: `${appUrl}/dashboard` },
+      options: { redirectTo: `${appUrl}/auth/callback?next=/update-password` },
     })
 
     if (linkError || !linkData?.properties?.action_link) {
