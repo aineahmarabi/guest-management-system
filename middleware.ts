@@ -1,65 +1,33 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { convexAuthNextjsMiddleware, createRouteMatcher, nextjsMiddlewareRedirect } from '@convex-dev/auth/nextjs/server'
 
-export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request })
+const isProtectedRoute = createRouteMatcher([
+  '/dashboard(.*)',
+  '/events(.*)',
+  '/reports(.*)',
+  '/settings(.*)',
+  '/checkin(.*)',
+  '/scan(.*)',
+  '/update-password(.*)',
+])
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll()
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          )
-          supabaseResponse = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          )
-        },
-      },
-    }
-  )
+const isAuthRoute = createRouteMatcher(['/login'])
 
-  const { data: { user } } = await supabase.auth.getUser()
+export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
+  const isAuthenticated = await convexAuth.isAuthenticated()
 
-  const pathname = request.nextUrl.pathname
-
-  if (
-    pathname.startsWith('/dashboard') ||
-    pathname.startsWith('/events') ||
-    pathname.startsWith('/reports') ||
-    pathname.startsWith('/settings') ||
-    pathname.startsWith('/checkin') ||
-    pathname.startsWith('/scan') ||
-    pathname.startsWith('/update-password')
-  ) {
-    if (!user) {
-      return NextResponse.redirect(new URL('/login', request.url))
-    }
-
-
+  if (isProtectedRoute(request) && !isAuthenticated) {
+    return nextjsMiddlewareRedirect(request, '/login')
   }
 
-  if (pathname === '/login' && user) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+  if (isAuthRoute(request) && isAuthenticated) {
+    return nextjsMiddlewareRedirect(request, '/dashboard')
   }
 
-  if (pathname === '/') {
-    return NextResponse.redirect(
-      new URL(user ? '/dashboard' : '/login', request.url)
-    )
+  if (request.nextUrl.pathname === '/') {
+    return nextjsMiddlewareRedirect(request, isAuthenticated ? '/dashboard' : '/login')
   }
-
-  return supabaseResponse
-}
+})
 
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }
