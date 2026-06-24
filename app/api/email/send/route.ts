@@ -1,36 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchMutation } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { generateTicketPDF } from '@/lib/pdf'
 import { sendEmail, buildInviteEmailHtml } from '@/lib/email'
-import { Guest, Event } from '@/types/supabase'
+import { Id } from '@/convex/_generated/dataModel'
 
 export async function POST(request: NextRequest) {
   try {
-    const serverSupabase = createClient()
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const token = await convexAuthNextjsToken()
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { guestId } = await request.json()
+    if (!guestId) return NextResponse.json({ error: 'guestId is required' }, { status: 400 })
 
-    if (!guestId) {
-      return NextResponse.json({ error: 'guestId is required' }, { status: 400 })
-    }
+    const guest = await fetchQuery(api.guests.getById, { id: guestId as Id<'guests'> }, { token })
+    if (!guest) return NextResponse.json({ error: 'Guest not found' }, { status: 404 })
 
-    const supabase = createAdminClient()
-
-    const { data, error } = await supabase
-      .from('guests')
-      .select('*, events(*)')
-      .eq('id', guestId)
-      .single()
-
-    if (error || !data) {
-      return NextResponse.json({ error: 'Guest not found' }, { status: 404 })
-    }
-
-    const guest = data as Guest & { events: Event }
-    const event = guest.events
+    const event = await fetchQuery(api.events.getById, { id: guest.event_id }, { token })
+    if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 })
 
     const formattedDate = new Date(event.event_date).toLocaleDateString('en-KE', {
       weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
@@ -62,32 +50,18 @@ export async function POST(request: NextRequest) {
         toName: guest.full_name,
         subject: `Your Invitation — ${event.name}`,
         html,
-        attachments: [
-          {
-            filename: `ticket-${guest.ticket_id}.pdf`,
-            content: Buffer.from(pdfBytes),
-            contentType: 'application/pdf',
-          },
-        ],
+        attachments: [{ filename: `ticket-${guest.ticket_id}.pdf`, content: Buffer.from(pdfBytes), contentType: 'application/pdf' }],
       })
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const db = supabase as any
       await Promise.all([
-        db.from('guests').update({ email_sent: true, pdf_generated: true }).eq('id', guestId),
-        db.from('email_logs').insert({ event_id: event.id, guest_id: guest.id, status: 'sent' }),
+        fetchMutation(api.guests.markEmailSent, { id: guest._id }, { token }),
+        fetchMutation(api.emailLogs.insert, { event_id: event._id, guest_id: guest._id, status: 'sent' }, { token }),
       ])
 
       return NextResponse.json({ success: true })
     } catch (emailError: unknown) {
       const message = emailError instanceof Error ? emailError.message : 'Unknown error'
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from('email_logs').insert({
-        event_id: event.id,
-        guest_id: guest.id,
-        status: 'failed',
-        error_message: message,
-      })
+      await fetchMutation(api.emailLogs.insert, { event_id: event._id, guest_id: guest._id, status: 'failed', error_message: message }, { token })
       return NextResponse.json({ error: 'Email failed to send', detail: message }, { status: 500 })
     }
   } catch {

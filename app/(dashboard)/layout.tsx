@@ -1,27 +1,15 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 
-export default async function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
-  const supabase = createClient()
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const token = await convexAuthNextjsToken()
+  if (!token) return redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) return redirect('/login')
-
-  const admin = createAdminClient()
-  const { data: profile } = await admin
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
+  const profile = await fetchQuery(api.profiles.getMe, {}, { token })
   if (!profile) return redirect('/login')
 
   return (

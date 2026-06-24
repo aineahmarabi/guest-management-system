@@ -1,25 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchMutation } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Guest, Event } from '@/types/supabase'
 
 export default async function ScanPage({ params }: { params: { ticketId: string } }) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect(`/login?next=/scan/${params.ticketId}`)
+  const token = await convexAuthNextjsToken()
+  if (!token) redirect(`/login?next=/scan/${params.ticketId}`)
 
-  const admin = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = admin as any
+  const guest = await fetchQuery(api.guests.getByTicketId, { ticket_id: params.ticketId.trim() }, { token })
 
-  const { data: guestData } = await db
-    .from('guests')
-    .select('*, events(*)')
-    .eq('ticket_id', params.ticketId.trim())
-    .single()
-
-  if (!guestData) {
+  if (!guest) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0D0D0D] p-4">
         <div className="bg-[#1A1A1A] border border-[#DC2626]/40 rounded-[6px] p-8 w-full max-w-sm text-center">
@@ -35,10 +26,8 @@ export default async function ScanPage({ params }: { params: { ticketId: string 
     )
   }
 
-  const guest = guestData as Guest & { events: Event }
-  const event = guest.events
+  const event = await fetchQuery(api.events.getById, { id: guest.event_id }, { token })
 
-  // Already checked in — show info without re-checking
   if (guest.checked_in) {
     const checkedInTime = guest.checked_in_at
       ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
@@ -60,37 +49,8 @@ export default async function ScanPage({ params }: { params: { ticketId: string 
     )
   }
 
-  // Perform check-in
+  await fetchMutation(api.guests.checkIn, { id: guest._id }, { token })
   const checkedInAt = new Date().toISOString()
-  await db
-    .from('guests')
-    .update({ checked_in: true, checked_in_at: checkedInAt })
-    .eq('id', guest.id)
-
-  // Fire confirmation email (non-blocking)
-  if (event) {
-    const formattedDate = new Date(event.event_date).toLocaleDateString('en-KE', {
-      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-    })
-    const formattedTime = new Date(checkedInAt).toLocaleTimeString('en-KE', {
-      hour: '2-digit', minute: '2-digit',
-    })
-    fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? 'https://dualpix-gms.vercel.app'}/api/checkin/confirm-email`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        guestName: guest.full_name,
-        guestEmail: guest.email,
-        eventName: event.name,
-        eventDate: formattedDate,
-        eventTime: event.event_time,
-        venue: event.venue,
-        checkedInAt: formattedTime,
-        escortCount: guest.escort_count,
-      }),
-    }).catch(() => {})
-  }
-
   const checkedInTime = new Date(checkedInAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
 
   return (

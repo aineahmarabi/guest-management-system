@@ -2,11 +2,15 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Guest } from '@/types/supabase'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Doc } from '@/convex/_generated/dataModel'
+
+type Guest = Doc<'guests'>
 
 export default function GuestActions({ guest, eventId }: { guest: Guest; eventId: string }) {
   const router = useRouter()
+  const removeGuest = useMutation(api.guests.remove)
   const [emailLoading, setEmailLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -15,7 +19,7 @@ export default function GuestActions({ guest, eventId }: { guest: Guest; eventId
     await fetch('/api/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guestId: guest.id }),
+      body: JSON.stringify({ guestId: guest._id }),
     })
     setEmailLoading(false)
     router.refresh()
@@ -24,31 +28,23 @@ export default function GuestActions({ guest, eventId }: { guest: Guest; eventId
   async function handleDelete() {
     if (!window.confirm(`Delete ${guest.full_name}? This cannot be undone.`)) return
     setDeleting(true)
-    const supabase = createClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from('guests').delete().eq('id', guest.id)
-    setDeleting(false)
-    router.refresh()
+    try {
+      await removeGuest({ id: guest._id })
+      router.refresh()
+    } catch {
+      setDeleting(false)
+    }
   }
 
-  // suppress unused eventId warning in future
   void eventId
 
   return (
     <div className="flex gap-2 items-center">
-      <button
-        onClick={handleResendEmail}
-        disabled={emailLoading}
-        className="text-[#9CA3AF] hover:text-white text-xs transition-colors disabled:opacity-50"
-      >
+      <button onClick={handleResendEmail} disabled={emailLoading} className="text-[#9CA3AF] hover:text-white text-xs transition-colors disabled:opacity-50">
         {emailLoading ? 'Sending...' : 'Resend Email'}
       </button>
       <span className="text-[#2A2A2A]">·</span>
-      <button
-        onClick={handleDelete}
-        disabled={deleting}
-        className="text-[#DC2626] hover:text-red-400 text-xs transition-colors disabled:opacity-50"
-      >
+      <button onClick={handleDelete} disabled={deleting} className="text-[#DC2626] hover:text-red-400 text-xs transition-colors disabled:opacity-50">
         {deleting ? 'Deleting...' : 'Delete'}
       </button>
     </div>

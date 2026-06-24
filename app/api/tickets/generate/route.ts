@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchMutation } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { generateTicketPDF } from '@/lib/pdf'
-import { Guest, Event } from '@/types/supabase'
+import { Id } from '@/convex/_generated/dataModel'
 
 export async function POST(request: NextRequest) {
   try {
-    const serverSupabase = createClient()
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const token = await convexAuthNextjsToken()
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { guestId } = await request.json()
+    if (!guestId) return NextResponse.json({ error: 'guestId is required' }, { status: 400 })
 
-    if (!guestId) {
-      return NextResponse.json({ error: 'guestId is required' }, { status: 400 })
-    }
+    const guest = await fetchQuery(api.guests.getById, { id: guestId as Id<'guests'> }, { token })
+    if (!guest) return NextResponse.json({ error: 'Guest not found' }, { status: 404 })
 
-    const supabase = createAdminClient()
-
-    const { data, error: guestError } = await supabase
-      .from('guests')
-      .select('*, events(*)')
-      .eq('id', guestId)
-      .single()
-
-    if (guestError || !data) {
-      return NextResponse.json({ error: 'Guest not found' }, { status: 404 })
-    }
-
-    const guest = data as Guest & { events: Event }
-    const event = guest.events
+    const event = await fetchQuery(api.events.getById, { id: guest.event_id }, { token })
+    if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 })
 
     const pdfBytes = await generateTicketPDF({
       guestName: guest.full_name,
@@ -44,11 +32,7 @@ export async function POST(request: NextRequest) {
       escortCount: guest.escort_count,
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any)
-      .from('guests')
-      .update({ pdf_generated: true })
-      .eq('id', guestId)
+    await fetchMutation(api.guests.markPdfGenerated, { id: guest._id }, { token })
 
     return new NextResponse(Buffer.from(pdfBytes), {
       headers: {

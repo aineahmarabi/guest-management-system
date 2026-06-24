@@ -1,8 +1,9 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
-import { Guest, Event } from '@/types/supabase'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
 import ReportsFilters from './ReportsFilters'
+import { Id } from '@/convex/_generated/dataModel'
 
 export default async function ReportsPage({
   searchParams,
@@ -16,20 +17,14 @@ export default async function ReportsPage({
     minRate?: string
   }
 }) {
-  // Auth check via session client
-  const serverSupabase = createClient()
-  void (await serverSupabase.auth.getUser())
-
-  // All data fetched via admin client — bypasses RLS for accurate counts
-  const admin = createAdminClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = admin as any
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
 
   const now = new Date()
   const period = searchParams.period ?? 'all_time'
 
-  let startStr: string | null = null
-  let endStr: string | null = null
+  let startStr: string
+  let endStr: string
 
   if (period === 'custom' && searchParams.dateFrom && searchParams.dateTo) {
     startStr = searchParams.dateFrom
@@ -40,50 +35,34 @@ export default async function ReportsPage({
   } else if (period === 'last_month') {
     startStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
     endStr = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
-  }
-  // all_time: startStr/endStr stay null — no date filter
-
-  // All events for dropdown
-  const { data: allEventsData } = await db
-    .from('events')
-    .select('id, name')
-    .order('event_date', { ascending: false })
-  const allEventsForDropdown = (allEventsData ?? []) as { id: string; name: string }[]
-
-  // Filtered events query
-  let eventsQuery = db
-    .from('events')
-    .select('*')
-    .order('event_date', { ascending: false })
-
-  if (startStr) eventsQuery = eventsQuery.gte('event_date', startStr)
-  if (endStr) eventsQuery = eventsQuery.lte('event_date', endStr)
-  if (searchParams.eventId && searchParams.eventId !== 'all') {
-    eventsQuery = eventsQuery.eq('id', searchParams.eventId)
-  }
-  if (searchParams.status && searchParams.status !== 'all') {
-    eventsQuery = eventsQuery.eq('status', searchParams.status)
+  } else {
+    // all_time — use a wide date range
+    startStr = '2000-01-01'
+    endStr = '2099-12-31'
   }
 
-  const { data: eventsData } = await eventsQuery
-  const events = (eventsData ?? []) as Event[]
-  const eventIds = events.map(e => e.id)
+  const allEvents = await fetchQuery(api.events.list, {}, { token })
+  const allEventsForDropdown = allEvents.map(e => ({ id: e._id, name: e.name }))
 
-  // Guests for filtered events
-  let allGuests: Guest[] = []
-  if (eventIds.length > 0) {
-    const { data: guestData } = await db
-      .from('guests')
-      .select('*')
-      .in('event_id', eventIds)
-    allGuests = (guestData ?? []) as Guest[]
-  }
+  const filteredEvents = await fetchQuery(
+    api.events.listInRange,
+    {
+      startDate: startStr,
+      endDate: endStr,
+      status: (searchParams.status && searchParams.status !== 'all') ? searchParams.status : undefined,
+      eventId: (searchParams.eventId && searchParams.eventId !== 'all') ? searchParams.eventId as Id<'events'> : undefined,
+    },
+    { token }
+  )
 
-  // Min attendance rate post-filter
   const minRate = searchParams.minRate ? parseInt(searchParams.minRate) : 0
 
-  const eventRows = events.map(event => {
-    const eventGuests = allGuests.filter(g => g.event_id === event.id)
+  const allGuestArrays = await Promise.all(
+    filteredEvents.map(e => fetchQuery(api.guests.listByEventForReport, { event_id: e._id }, { token }))
+  )
+
+  const eventRows = filteredEvents.map((event, i) => {
+    const eventGuests = allGuestArrays[i]
     const attended = eventGuests.filter(g => g.checked_in).length
     const invites = eventGuests.length
     const eventRate = invites > 0 ? Math.round((attended / invites) * 100) : 0
@@ -135,7 +114,6 @@ export default async function ReportsPage({
         allEvents={allEventsForDropdown}
       />
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Total Events', value: totalEvents },
@@ -150,7 +128,6 @@ export default async function ReportsPage({
         ))}
       </div>
 
-      {/* Per-event table */}
       <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] overflow-hidden">
         <div className="px-5 py-4 border-b border-[#2A2A2A]">
           <h2 className="text-white font-medium text-sm">Events in Period</h2>
@@ -173,9 +150,9 @@ export default async function ReportsPage({
                 </tr>
               )}
               {eventRows.map(({ event, attended, invites, eventRate }) => (
-                <tr key={event.id} className="hover:bg-[#2A2A2A]/30 transition-colors">
+                <tr key={event._id} className="hover:bg-[#2A2A2A]/30 transition-colors">
                   <td className="px-5 py-3.5">
-                    <Link href={`/events/${event.id}/report`} className="text-white text-sm hover:text-[#800000] transition-colors font-medium">
+                    <Link href={`/events/${event._id}/report`} className="text-white text-sm hover:text-[#800000] transition-colors font-medium">
                       {event.name}
                     </Link>
                   </td>

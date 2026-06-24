@@ -1,68 +1,36 @@
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { Event, Guest } from '@/types/supabase'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
+import { api, internal } from '@/convex/_generated/api'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
-  const supabase = createClient()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const db = supabase as any
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Fetch profile via admin client
-  const admin = createAdminClient()
-  const { data: profileData } = await admin
-    .from('profiles')
-    .select('*')
-    .eq('id', user?.id ?? '')
-    .single()
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profile = profileData as any
+  const [profile, counts, upcomingEvents, recentGuests] = await Promise.all([
+    fetchQuery(api.profiles.getMe, {}, { token }),
+    fetchQuery(api.guests.countsAll, {}, { token }),
+    fetchQuery(api.events.upcoming, { limit: 5 }, { token }),
+    fetchQuery(api.guests.recentAll, { limit: 5 }, { token }),
+  ])
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 
-  const totalEventsQuery = db.from('events').select('*', { count: 'exact', head: true })
-  const eventsThisMonthQuery = db.from('events').select('*', { count: 'exact', head: true }).gte('created_at', firstOfMonth)
-  const upcomingEventsQuery = db
-    .from('events')
-    .select('id, name, venue, event_date, event_time, status')
-    .gte('event_date', now.toISOString().split('T')[0])
-    .order('event_date', { ascending: true })
-    .limit(5)
+  const allEvents = await fetchQuery(api.events.list, {}, { token })
+  const totalEvents = allEvents.length
+  const eventsThisMonth = allEvents.filter(e => e.created_at >= firstOfMonth).length
+  const totalGuests = counts.total
+  const checkedInCount = counts.checked_in
+  const attendanceRate = totalGuests > 0 ? Math.round((checkedInCount / totalGuests) * 100) : 0
 
-  const [
-    totalEventsRes,
-    eventsThisMonthRes,
-    totalGuestsRes,
-    upcomingEventsRes,
-    recentGuestsRes,
-    checkedInGuestsRes,
-  ] = await Promise.all([
-    totalEventsQuery,
-    eventsThisMonthQuery,
-    supabase.from('guests').select('*', { count: 'exact', head: true }),
-    upcomingEventsQuery,
-    db
-      .from('guests')
-      .select('id, full_name, ticket_id, email_sent, checked_in, event_id, events(name)')
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabase.from('guests').select('*', { count: 'exact', head: true }).eq('checked_in', true),
-  ])
-
-  const totalEvents = totalEventsRes.count ?? 0
-  const eventsThisMonth = eventsThisMonthRes.count ?? 0
-  const totalGuests = totalGuestsRes.count ?? 0
-  const checkedInCount = checkedInGuestsRes.count ?? 0
-  const upcomingEvents = (upcomingEventsRes.data ?? []) as Event[]
-  const recentGuests = (recentGuestsRes.data ?? []) as (Guest & { events: { name: string } | null })[]
-
-  const attendanceRate = totalGuests > 0
-    ? Math.round((checkedInCount / totalGuests) * 100)
-    : 0
+  // For recent guests, fetch their event names
+  const recentWithEvents = await Promise.all(
+    recentGuests.map(async g => {
+      const event = await fetchQuery(api.events.getById, { id: g.event_id }, { token })
+      return { ...g, eventName: event?.name ?? null }
+    })
+  )
 
   const statusColor: Record<string, string> = {
     draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10',
@@ -75,15 +43,10 @@ export default async function DashboardPage() {
   return (
     <div className="p-4 md:p-8">
       <div className="mb-6 md:mb-8">
-        <h1 className="text-white text-xl md:text-2xl font-semibold">
-          Welcome back, {welcomeName}
-        </h1>
-        <p className="text-[#9CA3AF] text-sm mt-1">
-          Overview of all events and guests
-        </p>
+        <h1 className="text-white text-xl md:text-2xl font-semibold">Welcome back, {welcomeName}</h1>
+        <p className="text-[#9CA3AF] text-sm mt-1">Overview of all events and guests</p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8">
         {[
           { label: 'Total Events', value: totalEvents },
@@ -99,7 +62,6 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Events */}
         <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
             <h2 className="text-white font-medium text-sm">Upcoming Events</h2>
@@ -111,8 +73,8 @@ export default async function DashboardPage() {
             )}
             {upcomingEvents.map(event => (
               <Link
-                key={event.id}
-                href={`/events/${event.id}`}
+                key={event._id}
+                href={`/events/${event._id}`}
                 className="flex items-center justify-between px-5 py-3.5 hover:bg-[#2A2A2A]/50 transition-colors"
               >
                 <div>
@@ -132,30 +94,25 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Guests */}
         <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
             <h2 className="text-white font-medium text-sm">Recently Added Guests</h2>
           </div>
           <div className="divide-y divide-[#2A2A2A]">
-            {recentGuests.length === 0 && (
+            {recentWithEvents.length === 0 && (
               <div className="px-5 py-6 text-[#9CA3AF] text-sm text-center">No guests added yet</div>
             )}
-            {recentGuests.map(guest => (
-              <div key={guest.id} className="flex items-center justify-between px-5 py-3.5">
+            {recentWithEvents.map(guest => (
+              <div key={guest._id} className="flex items-center justify-between px-5 py-3.5">
                 <div>
                   <div className="text-white text-sm font-medium">{guest.full_name}</div>
-                  <div className="text-[#9CA3AF] text-xs mt-0.5">{guest.events?.name}</div>
+                  <div className="text-[#9CA3AF] text-xs mt-0.5">{guest.eventName}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-[#9CA3AF] text-xs font-mono">{guest.ticket_id}</div>
                   <div className="flex gap-1.5 mt-1 justify-end">
-                    {guest.email_sent && (
-                      <span className="text-xs text-[#16A34A] bg-[#16A34A]/10 px-1.5 py-0.5 rounded">Email sent</span>
-                    )}
-                    {guest.checked_in && (
-                      <span className="text-xs text-[#800000] bg-[#800000]/10 px-1.5 py-0.5 rounded">Checked in</span>
-                    )}
+                    {guest.email_sent && <span className="text-xs text-[#16A34A] bg-[#16A34A]/10 px-1.5 py-0.5 rounded">Email sent</span>}
+                    {guest.checked_in && <span className="text-xs text-[#800000] bg-[#800000]/10 px-1.5 py-0.5 rounded">Checked in</span>}
                   </div>
                 </div>
               </div>

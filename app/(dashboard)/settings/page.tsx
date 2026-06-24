@@ -1,10 +1,12 @@
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { redirect } from 'next/navigation'
-import { Profile } from '@/types/supabase'
 import UserManagement from './UserManagement'
 import OrgSettingsForm from './OrgSettingsForm'
 import ProfileForm from './ProfileForm'
+import ChangePasswordForm from './ChangePasswordForm'
+import { Doc } from '@/convex/_generated/dataModel'
 
 const ORG_DEFAULTS = {
   company_name: 'Dualpix Communications Ltd',
@@ -15,40 +17,24 @@ const ORG_DEFAULTS = {
 }
 
 export default async function SettingsPage() {
-  const supabase = createClient()
-  const admin = createAdminClient()
+  const token = await convexAuthNextjsToken()
+  if (!token) redirect('/login')
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const profile = await fetchQuery(api.profiles.getMe, {}, { token })
+  if (!profile) redirect('/login')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profileData } = await (admin as any)
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
+  const isSuperAdmin = profile.role === 'super_admin'
 
-  const profile = profileData as Profile | null
-  const isSuperAdmin = profile?.role === 'super_admin'
-
-  let users: Profile[] = []
+  let users: Doc<'profiles'>[] = []
   let orgSettings = ORG_DEFAULTS
 
   if (isSuperAdmin) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: usersData } = await (admin as any)
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true })
-    users = (usersData ?? []) as Profile[]
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: orgData } = await (admin as any).from('org_settings').select('*').single()
-      if (orgData) orgSettings = { ...ORG_DEFAULTS, ...orgData }
-    } catch {
-      // table not yet created — use defaults
-    }
+    const [usersData, orgData] = await Promise.all([
+      fetchQuery(api.adminUsers.listAllProfiles, {}, { token }),
+      fetchQuery(api.orgSettings.get, {}, { token }),
+    ])
+    users = usersData
+    if (orgData) orgSettings = { ...ORG_DEFAULTS, ...orgData }
   }
 
   return (
@@ -60,15 +46,13 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <ProfileForm
-        initialName={profile?.full_name ?? ''}
-        email={profile?.email ?? user.email ?? ''}
-      />
+      <ProfileForm initialName={profile.full_name} email={profile.email} />
+      <ChangePasswordForm />
 
       {isSuperAdmin && (
         <>
           <OrgSettingsForm initial={orgSettings} />
-          <UserManagement users={users} currentUserId={user.id} />
+          <UserManagement users={users} currentProfileId={profile._id} />
         </>
       )}
     </div>

@@ -1,28 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { notFound } from 'next/navigation'
+import { Id } from '@/convex/_generated/dataModel'
 import CheckinScanner from './CheckinScanner'
 
 export default async function CheckinPage({ params }: { params: { id: string } }) {
-  const supabase = createClient()
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, name, event_date, venue')
-    .eq('id', params.id)
-    .single()
-
+  const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
   if (!event) notFound()
 
-  const [{ count: totalGuests }, { count: checkedIn }] = await Promise.all([
-    supabase.from('guests').select('*', { count: 'exact', head: true }).eq('event_id', params.id),
-    supabase.from('guests').select('*', { count: 'exact', head: true }).eq('event_id', params.id).eq('checked_in', true),
-  ])
+  const counts = await fetchQuery(api.guests.countByEvent, { event_id: event._id }, { token })
 
   return (
     <CheckinScanner
-      event={event}
-      initialTotal={totalGuests ?? 0}
-      initialCheckedIn={checkedIn ?? 0}
+      event={{ _id: event._id, name: event.name, event_date: event.event_date, venue: event.venue }}
+      initialTotal={counts.total}
+      initialCheckedIn={counts.checked_in}
     />
   )
 }

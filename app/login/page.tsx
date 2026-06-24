@@ -1,23 +1,31 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
+import { useAuthActions } from '@convex-dev/auth/react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { loginAction } from './actions'
 
 export default function LoginPage() {
+  const { signIn } = useAuthActions()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
-  const [isPending, startTransition] = useTransition()
+  const [isPending, setIsPending] = useState(false)
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    startTransition(async () => {
-      const result = await loginAction(email, password)
-      if (result?.error) setError(result.error)
-    })
+    setIsPending(true)
+    try {
+      await signIn('password', { email, password, flow: 'signIn' })
+      router.push('/dashboard')
+    } catch {
+      setError('Invalid email or password.')
+    } finally {
+      setIsPending(false)
+    }
   }
 
   return (
@@ -98,7 +106,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-[#4B5563] text-xs mt-6">
-          Dualpix Communications Ltd — Internal use only
+          Dualpix Communications Ltd &copy; {new Date().getFullYear()}. All rights reserved.
         </p>
       </div>
     </div>

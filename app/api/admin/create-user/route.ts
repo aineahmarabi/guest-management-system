@@ -1,77 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchAction } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { sendEmail } from '@/lib/email'
+
+function generateTempPassword(len = 12): string {
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const serverSupabase = createClient()
-    const { data: { user } } = await serverSupabase.auth.getUser()
+    const token = await convexAuthNextjsToken()
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const admin = createAdminClient()
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profileData } = await (admin as any)
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if ((profileData as { role: string } | null)?.role !== 'super_admin') {
+    const profile = await fetchQuery(api.profiles.getMe, {}, { token })
+    if (profile?.role !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     const { full_name, email, role } = await request.json()
-
     if (!full_name || !email || !role) {
       return NextResponse.json({ error: 'Full name, email, and role are required' }, { status: 400 })
     }
 
+    const tempPassword = generateTempPassword()
+
+    try {
+      await fetchAction(api.adminUsersActions.createUser, { full_name, email, role, password: tempPassword }, { token })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create user'
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? `https://${request.headers.get('host')}`
 
-    // generateLink creates the auth user AND returns the invite URL in one call.
-    // This guarantees action_link is always populated.
-    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
-      type: 'invite',
-      email,
-      options: {
-        data: { full_name },
-        redirectTo: `${appUrl}/auth/callback`,
-      },
-    })
-
-    if (linkError || !linkData?.user?.id) {
-      return NextResponse.json(
-        { error: linkError?.message ?? 'Failed to generate invite link' },
-        { status: 400 }
-      )
-    }
-
-    const inviteUrl = linkData.properties?.action_link
-    const newUserId = linkData.user.id
-
-    // Insert profile row for the new user
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: profileError } = await (admin as any)
-      .from('profiles')
-      .insert({
-        id: newUserId,
-        full_name,
-        email,
-        role,
-        is_active: true,
-      })
-
-    if (profileError) {
-      await admin.auth.admin.deleteUser(newUserId)
-      return NextResponse.json({ error: 'Failed to create user profile' }, { status: 500 })
-    }
-
-    // Send invite email
     let emailSent = false
     try {
       const html = `
@@ -88,6 +51,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     .header p { color: #ffcccc; margin: 4px 0 0; font-size: 13px; }
     .body { padding: 32px; color: #1a1a1a; }
     .body p { line-height: 1.6; margin: 0 0 16px; }
+    .creds { background: #f5f5f5; border-radius: 6px; padding: 16px; font-family: monospace; font-size: 14px; margin: 16px 0; }
     .btn { display: inline-block; background: #800000; color: #ffffff !important; text-decoration: none; padding: 12px 28px; border-radius: 6px; font-weight: bold; font-size: 15px; }
     .footer { background: #f5f5f5; padding: 16px 32px; font-size: 12px; color: #888; text-align: center; }
     a { color: #800000; }
@@ -102,14 +66,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     <div class="body">
       <p>Dear <strong>${full_name}</strong>,</p>
       <p>You have been invited to join <strong>Dualpix Guest Management System</strong> as an <strong>${role === 'super_admin' ? 'Super Admin' : 'Event Manager'}</strong>.</p>
-      <p>Click the button below to set your password and get started:</p>
+      <p>Your login credentials are:</p>
+      <div class="creds">
+        Email: ${email}<br>
+        Password: ${tempPassword}
+      </div>
       <p style="margin: 24px 0;">
-        <a href="${inviteUrl}" class="btn">Accept Invitation &rarr;</a>
+        <a href="${appUrl}/login" class="btn">Sign In Now &rarr;</a>
       </p>
-      <p style="font-size: 12px; color: #888;">
-        Button not working? Copy and paste this link into your browser:<br>
-        <a href="${inviteUrl}" style="word-break: break-all;">${inviteUrl}</a>
-      </p>
+      <p style="font-size: 12px; color: #888;">Please change your password from Settings after your first login.</p>
       <p>Regards,<br><strong>Dualpix Communications Ltd</strong></p>
     </div>
     <div class="footer">
@@ -120,18 +85,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 </body>
 </html>`.trim()
 
-      await sendEmail({
-        to: email,
-        toName: full_name,
-        subject: "You've been invited to Dualpix GMS",
-        html,
-      })
+      await sendEmail({ to: email, toName: full_name, subject: "You've been invited to Dualpix GMS", html })
       emailSent = true
     } catch (emailErr) {
       console.error('Failed to send invite email:', emailErr)
     }
 
-    return NextResponse.json({ success: true, userId: newUserId, inviteUrl, emailSent })
+    return NextResponse.json({ success: true, emailSent, tempPassword: emailSent ? undefined : tempPassword })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

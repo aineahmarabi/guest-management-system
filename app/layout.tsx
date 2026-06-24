@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { ConvexAuthNextjsServerProvider } from '@convex-dev/auth/nextjs/server'
+import { ConvexClientProvider } from '@/components/ConvexClientProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -15,14 +17,14 @@ export const metadata: Metadata = {
   manifest: '/site.webmanifest',
 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
-    </html>
+    <ConvexAuthNextjsServerProvider>
+      <html lang="en">
+        <body>
+          <ConvexClientProvider>{children}</ConvexClientProvider>
+        </body>
+      </html>
+    </ConvexAuthNextjsServerProvider>
   )
 }

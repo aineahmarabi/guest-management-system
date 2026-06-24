@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useAuthActions } from '@convex-dev/auth/react'
 import { usePathname, useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import { Profile } from '@/types/supabase'
+import { Doc } from '@/convex/_generated/dataModel'
+
+type Profile = Doc<'profiles'>
 
 function getPageTitle(pathname: string): string {
   if (pathname === '/dashboard') return 'Dashboard'
@@ -21,6 +23,7 @@ function getPageTitle(pathname: string): string {
 }
 
 export default function Header({ profile }: { profile: Profile }) {
+  const { signOut } = useAuthActions()
   const pathname = usePathname()
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -44,8 +47,7 @@ export default function Header({ profile }: { profile: Profile }) {
   }, [open])
 
   async function handleSignOut() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+    await signOut()
     router.push('/login')
   }
 
@@ -67,15 +69,7 @@ export default function Header({ profile }: { profile: Profile }) {
               {profile.role === 'super_admin' ? 'Super Admin' : 'Event Manager'}
             </div>
           </div>
-          <svg
-            className="text-[#9CA3AF] hidden sm:block"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
+          <svg className="text-[#9CA3AF] hidden sm:block" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </button>
@@ -86,11 +80,7 @@ export default function Header({ profile }: { profile: Profile }) {
               <div className="text-white text-xs font-medium truncate">{profile.full_name}</div>
               <div className="text-[#9CA3AF] text-xs truncate mt-0.5">{profile.email}</div>
               <div className="mt-1.5">
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                  profile.role === 'super_admin'
-                    ? 'bg-[#800000]/20 text-[#800000]'
-                    : 'bg-[#2A2A2A] text-[#9CA3AF]'
-                }`}>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${profile.role === 'super_admin' ? 'bg-[#800000]/20 text-[#800000]' : 'bg-[#2A2A2A] text-[#9CA3AF]'}`}>
                   {profile.role === 'super_admin' ? 'Super Admin' : 'Event Manager'}
                 </span>
               </div>

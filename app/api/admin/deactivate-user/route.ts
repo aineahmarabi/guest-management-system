@@ -1,43 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchMutation } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
 
 export async function POST(request: NextRequest) {
   try {
-    const serverSupabase = createClient()
-    const { data: { user } } = await serverSupabase.auth.getUser()
+    const token = await convexAuthNextjsToken()
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const adminCheck = createAdminClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: profileData } = await (adminCheck as any)
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const profile = profileData as { role: string } | null
-
+    const profile = await fetchQuery(api.profiles.getMe, {}, { token })
     if (profile?.role !== 'super_admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const { userId } = await request.json()
+    const { profileId } = await request.json()
+    if (!profileId) return NextResponse.json({ error: 'profileId is required' }, { status: 400 })
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 })
-    }
-
-    if (userId === user.id) {
+    if (profileId === profile._id) {
       return NextResponse.json({ error: 'You cannot deactivate your own account.' }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (admin as any).from('profiles').update({ is_active: false }).eq('id', userId)
+    await fetchMutation(api.adminUsers.deactivateUser, { profileId: profileId as Id<'profiles'> }, { token })
 
     return NextResponse.json({ success: true })
   } catch {

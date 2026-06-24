@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { Id } from '@/convex/_generated/dataModel'
 
 interface ScanResult {
   status: 'success' | 'already_checked_in' | 'invalid'
@@ -16,7 +17,7 @@ export default function CheckinScanner({
   initialTotal,
   initialCheckedIn,
 }: {
-  event: { id: string; name: string; event_date: string; venue: string }
+  event: { _id: Id<'events'>; name: string; event_date: string; venue: string }
   initialTotal: number
   initialCheckedIn: number
 }) {
@@ -31,7 +32,6 @@ export default function CheckinScanner({
     inputRef.current?.focus()
   }, [])
 
-  // Re-focus after result clears
   useEffect(() => {
     if (!result) {
       inputRef.current?.focus()
@@ -82,7 +82,7 @@ export default function CheckinScanner({
     const res = await fetch('/api/checkin/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticketId: ticketId.trim(), eventId: event.id }),
+      body: JSON.stringify({ ticketId: ticketId.trim(), eventId: event._id }),
     })
 
     const data: ScanResult = await res.json()
@@ -103,7 +103,7 @@ export default function CheckinScanner({
     timerRef.current = setTimeout(() => {
       setResult(null)
     }, 4000)
-  }, [event.id, loading])
+  }, [event._id, loading])
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && input.trim()) {
@@ -128,7 +128,6 @@ export default function CheckinScanner({
 
   return (
     <div className="min-h-screen bg-[#0D0D0D] flex flex-col">
-      {/* Header */}
       <div className="border-b border-[#2A2A2A] px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-white text-xl font-semibold">{event.name}</h1>
@@ -137,15 +136,11 @@ export default function CheckinScanner({
             {' · '}{event.venue}
           </p>
         </div>
-        <Link
-          href={`/events/${event.id}`}
-          className="text-[#9CA3AF] hover:text-white text-sm transition-colors"
-        >
+        <Link href={`/events/${event._id}`} className="text-[#9CA3AF] hover:text-white text-sm transition-colors">
           ← Back
         </Link>
       </div>
 
-      {/* Stats bar */}
       <div className="grid grid-cols-3 border-b border-[#2A2A2A]">
         <div className="px-6 py-4 text-center border-r border-[#2A2A2A]">
           <div className="text-[#16A34A] text-3xl font-bold font-mono">{checkedIn}</div>
@@ -161,30 +156,20 @@ export default function CheckinScanner({
         </div>
       </div>
 
-      {/* Progress bar */}
       <div className="h-1 bg-[#2A2A2A]">
-        <div
-          className="h-1 bg-[#16A34A] transition-all duration-500"
-          style={{ width: `${rate}%` }}
-        />
+        <div className="h-1 bg-[#16A34A] transition-all duration-500" style={{ width: `${rate}%` }} />
       </div>
 
-      {/* Scanner area */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-        {/* Result display */}
         {result ? (
           <div className={`w-full max-w-lg border-2 rounded-[6px] p-8 text-center mb-8 ${resultColors[result.status]}`}>
-            <div className="text-white text-5xl font-bold mb-4">
-              {resultIcons[result.status]}
-            </div>
+            <div className="text-white text-5xl font-bold mb-4">{resultIcons[result.status]}</div>
             <div className="text-white text-2xl font-bold mb-2">
               {result.status === 'success' && 'ADMITTED'}
               {result.status === 'already_checked_in' && 'ALREADY CHECKED IN'}
               {result.status === 'invalid' && 'INVALID TICKET'}
             </div>
-            {result.guestName && (
-              <div className="text-white text-xl mt-1">{result.guestName}</div>
-            )}
+            {result.guestName && <div className="text-white text-xl mt-1">{result.guestName}</div>}
             {result.status === 'success' && result.escortCount !== undefined && result.escortCount > 0 && (
               <div className="text-white/80 text-lg mt-1">+ {result.escortCount} Escort{result.escortCount > 1 ? 's' : ''}</div>
             )}
@@ -193,9 +178,7 @@ export default function CheckinScanner({
                 Originally checked in at {new Date(result.checkedInAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })}
               </div>
             )}
-            {result.status === 'invalid' && (
-              <div className="text-white/80 text-sm mt-2">Gate Crasher — Do not admit</div>
-            )}
+            {result.status === 'invalid' && <div className="text-white/80 text-sm mt-2">Gate Crasher — Do not admit</div>}
           </div>
         ) : (
           <div className="w-full max-w-lg border-2 border-dashed border-[#2A2A2A] rounded-[6px] p-8 text-center mb-8">
@@ -205,7 +188,6 @@ export default function CheckinScanner({
           </div>
         )}
 
-        {/* Input */}
         <div className="w-full max-w-lg">
           <input
             ref={inputRef}

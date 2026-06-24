@@ -1,40 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createClient } from '@/lib/supabase/server'
-import { Guest, Event } from '@/types/supabase'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery, fetchMutation } from 'convex/nextjs'
+import { api } from '@/convex/_generated/api'
 import { sendEmail, buildCheckinConfirmationHtml } from '@/lib/email'
 
 export async function POST(request: NextRequest) {
   try {
-    const serverSupabase = createClient()
-    const { data: { user } } = await serverSupabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const token = await convexAuthNextjsToken()
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { ticketId, eventId } = await request.json()
-
     if (!ticketId) {
       return NextResponse.json({ status: 'invalid', message: 'No ticket ID provided' }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const guest = await fetchQuery(
+      api.guests.getByTicketId,
+      { ticket_id: ticketId.trim(), ...(eventId ? { event_id: eventId } : {}) },
+      { token }
+    )
 
-    let query = supabase
-      .from('guests')
-      .select('*')
-      .eq('ticket_id', ticketId.trim())
-
-    if (eventId) {
-      query = query.eq('event_id', eventId)
-    }
-
-    const { data } = await query
-    const guests = (data ?? []) as Guest[]
-
-    if (guests.length === 0) {
+    if (!guest) {
       return NextResponse.json({ status: 'invalid', message: 'INVALID TICKET — Gate Crasher' })
     }
-
-    const guest = guests[0]
 
     if (guest.checked_in) {
       return NextResponse.json({
@@ -46,25 +34,13 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    await fetchMutation(api.guests.checkIn, { id: guest._id }, { token })
+
     const checkedInAt = new Date().toISOString()
-    const { error: updateError } = await supabase
-      .from('guests')
-      .update({ checked_in: true, checked_in_at: checkedInAt } as never)
-      .eq('id', guest.id)
 
-    if (updateError) {
-      return NextResponse.json({ status: 'invalid', message: 'Check-in failed, please try again' })
-    }
-
-    // Fire confirmation email in background — don't block the check-in response
-    supabase
-      .from('events')
-      .select('*')
-      .eq('id', guest.event_id)
-      .single()
-      .then(({ data: eventData }) => {
-        if (!eventData) return
-        const event = eventData as Event
+    fetchQuery(api.events.getById, { id: guest.event_id }, { token })
+      .then(event => {
+        if (!event) return
         const formattedDate = new Date(event.event_date).toLocaleDateString('en-KE', {
           weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
         })
@@ -80,13 +56,9 @@ export async function POST(request: NextRequest) {
           checkedInAt: formattedTime,
           escortCount: guest.escort_count,
         })
-        sendEmail({
-          to: guest.email,
-          toName: guest.full_name,
-          subject: `Attendance Confirmed — ${event.name}`,
-          html,
-        }).catch(() => {})
+        sendEmail({ to: guest.email, toName: guest.full_name, subject: `Attendance Confirmed — ${event.name}`, html }).catch(() => {})
       })
+      .catch(() => {})
 
     return NextResponse.json({
       status: 'success',

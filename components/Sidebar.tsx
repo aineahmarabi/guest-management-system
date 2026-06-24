@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Profile } from '@/types/supabase'
+import { Doc } from '@/convex/_generated/dataModel'
+
+type Profile = Doc<'profiles'>
 
 const navItems = [
   {
@@ -89,7 +91,6 @@ const adminItems = [
   },
 ]
 
-// Camera icon for mobile tab
 const CameraIcon = ({ size = 20 }: { size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
@@ -107,35 +108,22 @@ export default function Sidebar({ profile }: { profile: Profile }) {
 
   return (
     <>
-      {/* ── Desktop sidebar (md and above) ── */}
       <aside className="hidden md:flex w-56 bg-[#1A1A1A] border-r border-[#2A2A2A] flex-col h-screen sticky top-0">
-        {/* Brand */}
         <div className="px-4 py-5 border-b border-[#2A2A2A]">
           <div className="flex items-center gap-3">
-            <Image
-              src="/logo.png"
-              alt="Dualpix GMS"
-              width={32}
-              height={32}
-              className="rounded-[6px] flex-shrink-0"
-            />
+            <Image src="/logo.png" alt="Dualpix GMS" width={32} height={32} className="rounded-[6px] flex-shrink-0" />
             <div>
               <div className="text-white text-sm font-semibold">Dualpix GMS</div>
             </div>
           </div>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-2 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map(item => (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${
-                isActive(item.href)
-                  ? 'bg-[#800000] text-white'
-                  : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'
-              }`}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${isActive(item.href) ? 'bg-[#800000] text-white' : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'}`}
             >
               {item.icon}
               {item.label}
@@ -151,68 +139,33 @@ export default function Sidebar({ profile }: { profile: Profile }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${
-                isActive(item.href)
-                  ? 'bg-[#800000] text-white'
-                  : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'
-              }`}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-[6px] text-sm transition-colors ${isActive(item.href) ? 'bg-[#800000] text-white' : 'text-[#9CA3AF] hover:text-white hover:bg-[#2A2A2A]'}`}
             >
               {item.icon}
               {item.label}
             </Link>
           ))}
         </nav>
-
       </aside>
 
-      {/* ── Mobile bottom tab bar (below md) ── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#1A1A1A] border-t border-[#2A2A2A] h-14 flex items-center">
-        {/* Dashboard */}
-        <Link
-          href="/dashboard"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-          style={{ color: isActive('/dashboard') ? '#800000' : '#9CA3AF' }}
-        >
+        <Link href="/dashboard" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/dashboard') ? '#800000' : '#9CA3AF' }}>
           {navItems[0].mobileIcon}
           <span className="text-[10px] font-medium">Dashboard</span>
         </Link>
-
-        {/* Events */}
-        <Link
-          href="/events"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-          style={{ color: isActive('/events') ? '#800000' : '#9CA3AF' }}
-        >
+        <Link href="/events" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/events') ? '#800000' : '#9CA3AF' }}>
           {navItems[1].mobileIcon}
           <span className="text-[10px] font-medium">Events</span>
         </Link>
-
-        {/* Camera */}
-        <Link
-          href="/checkin"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-          style={{ color: isActive('/checkin') ? '#800000' : '#9CA3AF' }}
-        >
+        <Link href="/checkin" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/checkin') ? '#800000' : '#9CA3AF' }}>
           <CameraIcon size={20} />
           <span className="text-[10px] font-medium">Camera</span>
         </Link>
-
-        {/* Reports */}
-        <Link
-          href="/reports"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-          style={{ color: isActive('/reports') ? '#800000' : '#9CA3AF' }}
-        >
+        <Link href="/reports" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/reports') ? '#800000' : '#9CA3AF' }}>
           {navItems[2].mobileIcon}
           <span className="text-[10px] font-medium">Reports</span>
         </Link>
-
-        {/* Settings — all users */}
-        <Link
-          href="/settings"
-          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1"
-          style={{ color: isActive('/settings') ? '#800000' : '#9CA3AF' }}
-        >
+        <Link href="/settings" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/settings') ? '#800000' : '#9CA3AF' }}>
           {adminItems[0].mobileIcon}
           <span className="text-[10px] font-medium">Settings</span>
         </Link>
