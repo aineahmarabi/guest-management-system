@@ -1,6 +1,6 @@
 import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
 import { fetchQuery } from 'convex/nextjs'
-import { api, internal } from '@/convex/_generated/api'
+import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
