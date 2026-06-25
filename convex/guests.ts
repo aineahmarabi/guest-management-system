@@ -53,6 +53,23 @@ export const recentAll = query({
   },
 });
 
+export const recentAllWithEvents = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, { limit = 5 }) => {
+    const guests = await ctx.db
+      .query("guests")
+      .withIndex("by_created_at")
+      .order("desc")
+      .take(limit);
+    return Promise.all(
+      guests.map(async g => {
+        const event = await ctx.db.get(g.event_id);
+        return { ...g, eventName: event?.name ?? null };
+      })
+    );
+  },
+});
+
 export const countByEvent = query({
   args: { event_id: v.id("events") },
   handler: async (ctx, { event_id }) => {

@@ -1,43 +1,41 @@
-import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
-import { fetchQuery } from 'convex/nextjs'
+'use client'
+
+import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
 
-export default async function DashboardPage() {
-  const token = await convexAuthNextjsToken()
-  if (!token) return null
+const statusColor: Record<string, string> = {
+  draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10',
+  active: 'text-[#16A34A] bg-[#16A34A]/10',
+  completed: 'text-[#800000] bg-[#800000]/10',
+}
 
-  const [profile, counts, upcomingEvents, recentGuests] = await Promise.all([
-    fetchQuery(api.profiles.getMe, {}, { token }),
-    fetchQuery(api.guests.countsAll, {}, { token }),
-    fetchQuery(api.events.upcoming, { limit: 5 }, { token }),
-    fetchQuery(api.guests.recentAll, { limit: 5 }, { token }),
-  ])
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center h-48">
+      <div className="w-5 h-5 border-2 border-[#800000] border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+export default function DashboardPage() {
+  const profile = useQuery(api.profiles.getMe)
+  const counts = useQuery(api.guests.countsAll)
+  const upcomingEvents = useQuery(api.events.upcoming, { limit: 5 })
+  const allEvents = useQuery(api.events.list, {})
+  const recentGuests = useQuery(api.guests.recentAllWithEvents, { limit: 5 })
+
+  if (counts === undefined || upcomingEvents === undefined || allEvents === undefined || recentGuests === undefined) {
+    return <Spinner />
+  }
 
   const now = new Date()
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-  const allEvents = await fetchQuery(api.events.list, {}, { token })
   const totalEvents = allEvents.length
   const eventsThisMonth = allEvents.filter(e => e.created_at >= firstOfMonth).length
   const totalGuests = counts.total
   const checkedInCount = counts.checked_in
   const attendanceRate = totalGuests > 0 ? Math.round((checkedInCount / totalGuests) * 100) : 0
-
-  // For recent guests, fetch their event names
-  const recentWithEvents = await Promise.all(
-    recentGuests.map(async g => {
-      const event = await fetchQuery(api.events.getById, { id: g.event_id }, { token })
-      return { ...g, eventName: event?.name ?? null }
-    })
-  )
-
-  const statusColor: Record<string, string> = {
-    draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10',
-    active: 'text-[#16A34A] bg-[#16A34A]/10',
-    completed: 'text-[#800000] bg-[#800000]/10',
-  }
-
   const welcomeName = profile?.full_name ? profile.full_name.split(' ')[0] : 'there'
 
   return (
@@ -99,10 +97,10 @@ export default async function DashboardPage() {
             <h2 className="text-white font-medium text-sm">Recently Added Guests</h2>
           </div>
           <div className="divide-y divide-[#2A2A2A]">
-            {recentWithEvents.length === 0 && (
+            {recentGuests.length === 0 && (
               <div className="px-5 py-6 text-[#9CA3AF] text-sm text-center">No guests added yet</div>
             )}
-            {recentWithEvents.map(guest => (
+            {recentGuests.map(guest => (
               <div key={guest._id} className="flex items-center justify-between px-5 py-3.5">
                 <div>
                   <div className="text-white text-sm font-medium">{guest.full_name}</div>

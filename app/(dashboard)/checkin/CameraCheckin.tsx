@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
 import jsQR from 'jsqr'
 
@@ -23,18 +25,10 @@ export default function CameraCheckin() {
   const [loading, setLoading] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [hasCamera, setHasCamera] = useState(true)
-  const [checkedInToday, setCheckedInToday] = useState(0)
   const [started, setStarted] = useState(false)
 
-  // Fetch stats
-  useEffect(() => {
-    fetch('/api/checkin/stats')
-      .then(r => r.json())
-      .then(d => {
-        if (typeof d.checkedInToday === 'number') setCheckedInToday(d.checkedInToday)
-      })
-      .catch(() => {})
-  }, [result])
+  const since = new Date(new Date().setHours(0, 0, 0, 0)).toISOString()
+  const checkedInToday = useQuery(api.guests.checkedInToday, { since }) ?? 0
 
   // Check if device has camera
   useEffect(() => {
@@ -95,7 +89,6 @@ export default function CameraCheckin() {
     setLoading(false)
 
     if (data.status === 'success') {
-      setCheckedInToday(prev => prev + 1)
       playSound('success')
     } else if (data.status === 'already_checked_in') {
       playSound('warning')

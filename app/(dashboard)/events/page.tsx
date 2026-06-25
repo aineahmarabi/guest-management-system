@@ -1,32 +1,41 @@
-import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
-import { fetchQuery } from 'convex/nextjs'
+'use client'
+
+import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
 
-export default async function EventsPage({
-  searchParams,
-}: {
-  searchParams: { status?: string; q?: string }
-}) {
-  const token = await convexAuthNextjsToken()
-  if (!token) return null
+const statusColor: Record<string, string> = {
+  draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10 border-[#9CA3AF]/20',
+  active: 'text-[#16A34A] bg-[#16A34A]/10 border-[#16A34A]/20',
+  completed: 'text-[#800000] bg-[#800000]/10 border-[#800000]/20',
+}
 
-  const events = await fetchQuery(
-    api.events.list,
-    { status: searchParams.status, search: searchParams.q },
-    { token }
-  )
+export default function EventsPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const [, startTransition] = useTransition()
 
-  const guestCounts = await fetchQuery(
+  const statusFilter = searchParams.get('status') ?? ''
+  const searchFilter = searchParams.get('q') ?? ''
+
+  const [searchInput, setSearchInput] = useState(searchFilter)
+
+  const events = useQuery(api.events.list, {
+    status: statusFilter || undefined,
+    search: searchFilter || undefined,
+  })
+  const guestCounts = useQuery(
     api.guests.countsByEvent,
-    { eventIds: events.map(e => e._id) },
-    { token }
+    events ? { eventIds: events.map(e => e._id) } : 'skip'
   )
 
-  const statusColor: Record<string, string> = {
-    draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10 border-[#9CA3AF]/20',
-    active: 'text-[#16A34A] bg-[#16A34A]/10 border-[#16A34A]/20',
-    completed: 'text-[#800000] bg-[#800000]/10 border-[#800000]/20',
+  function applyFilter(status: string, q: string) {
+    const params = new URLSearchParams()
+    if (status && status !== 'all') params.set('status', status)
+    if (q) params.set('q', q)
+    startTransition(() => router.push(`/events?${params.toString()}`))
   }
 
   return (
@@ -34,7 +43,7 @@ export default async function EventsPage({
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6 md:mb-8">
         <div>
           <h1 className="text-white text-2xl font-semibold">Events</h1>
-          <p className="text-[#9CA3AF] text-sm mt-1">{events.length} events total</p>
+          <p className="text-[#9CA3AF] text-sm mt-1">{events?.length ?? '—'} events total</p>
         </div>
         <Link href="/events/new" className="bg-[#800000] hover:bg-[#6B0000] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           + New Event
@@ -42,16 +51,17 @@ export default async function EventsPage({
       </div>
 
       <div className="mb-6">
-        <form className="flex flex-col sm:flex-row flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-3">
           <input
-            name="q"
-            defaultValue={searchParams.q}
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applyFilter(statusFilter, searchInput)}
             placeholder="Search events..."
             className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm placeholder-[#4B5563] focus:outline-none focus:border-[#800000] w-full sm:w-64"
           />
           <select
-            name="status"
-            defaultValue={searchParams.status ?? 'all'}
+            value={statusFilter || 'all'}
+            onChange={e => applyFilter(e.target.value, searchInput)}
             className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#800000]"
           >
             <option value="all">All statuses</option>
@@ -59,10 +69,13 @@ export default async function EventsPage({
             <option value="active">Active</option>
             <option value="completed">Completed</option>
           </select>
-          <button type="submit" className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm px-4 py-2 rounded-[6px] transition-colors">
+          <button
+            onClick={() => applyFilter(statusFilter, searchInput)}
+            className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm px-4 py-2 rounded-[6px] transition-colors"
+          >
             Filter
           </button>
-        </form>
+        </div>
       </div>
 
       <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] overflow-hidden">
@@ -76,7 +89,16 @@ export default async function EventsPage({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A2A2A]">
-              {events.length === 0 && (
+              {events === undefined && (
+                <tr>
+                  <td colSpan={6} className="text-center py-12">
+                    <div className="flex justify-center">
+                      <div className="w-5 h-5 border-2 border-[#800000] border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  </td>
+                </tr>
+              )}
+              {events?.length === 0 && (
                 <tr>
                   <td colSpan={6} className="text-center text-[#9CA3AF] text-sm py-12">
                     No events found.{' '}
@@ -84,7 +106,7 @@ export default async function EventsPage({
                   </td>
                 </tr>
               )}
-              {events.map(event => (
+              {events?.map(event => (
                 <tr key={event._id} className="hover:bg-[#2A2A2A]/30 transition-colors">
                   <td className="px-5 py-3.5">
                     <Link href={`/events/${event._id}`} className="text-white font-medium text-sm hover:text-[#800000] transition-colors">
@@ -103,7 +125,7 @@ export default async function EventsPage({
                       {event.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-[#9CA3AF] text-sm font-mono">{guestCounts[event._id] ?? 0}</td>
+                  <td className="px-5 py-3.5 text-[#9CA3AF] text-sm font-mono">{guestCounts?.[event._id] ?? 0}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex gap-2">
                       <Link href={`/events/${event._id}`} className="text-[#9CA3AF] hover:text-white text-xs transition-colors">View</Link>

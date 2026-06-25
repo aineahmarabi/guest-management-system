@@ -12,13 +12,9 @@ export default async function CheckinPage({ params }: { params: { id: string } }
   const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
   if (!event) notFound()
 
-  const counts = await fetchQuery(api.guests.countByEvent, { event_id: event._id }, { token })
-
   return (
     <CheckinScanner
       event={{ _id: event._id, name: event.name, event_date: event.event_date, venue: event.venue }}
-      initialTotal={counts.total}
-      initialCheckedIn={counts.checked_in}
     />
   )
 }
