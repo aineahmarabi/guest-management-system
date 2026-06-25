@@ -9,10 +9,16 @@ export async function POST(request: NextRequest) {
     const token = await convexAuthNextjsToken()
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { ticketId, eventId } = await request.json()
-    if (!ticketId) {
+    const { ticketId: rawTicketId, eventId } = await request.json()
+    if (!rawTicketId) {
       return NextResponse.json({ status: 'invalid', message: 'No ticket ID provided' }, { status: 400 })
     }
+
+    // QR codes may encode a full URL (e.g. https://app.vercel.app/scan/TICKET-123).
+    // Extract the bare ticket ID if that's the case.
+    let ticketId: string = rawTicketId.trim()
+    const urlMatch = ticketId.match(/\/scan\/([^/?#\s]+)/)
+    if (urlMatch) ticketId = urlMatch[1]
 
     const guest = await fetchQuery(
       api.guests.getByTicketId,
