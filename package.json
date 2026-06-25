@@ -11,12 +11,10 @@
   "dependencies": {
     "@auth/core": "^0.41.2",
     "@convex-dev/auth": "^0.0.94",
-    "bcryptjs": "^3.0.3",
     "convex": "^1.42.0",
     "jsqr": "^1.4.0",
     "next": "14.2.35",
     "nodemailer": "^7.0.13",
-    "oslo": "^1.2.1",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "react": "^18",
@@ -25,7 +23,6 @@
     "zeptomail": "^8.0.1"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
     "@types/nodemailer": "^6.4.0",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
