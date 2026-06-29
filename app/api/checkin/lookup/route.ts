@@ -3,17 +3,30 @@ import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
 import { fetchQuery } from 'convex/nextjs'
 import { api } from '@/convex/_generated/api'
 
+function extractTicketId(raw: string): string {
+  const trimmed = raw.trim()
+  try {
+    const url = new URL(trimmed)
+    const parts = url.pathname.split('/')
+    return parts[parts.length - 1] || trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = await convexAuthNextjsToken()
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const ticketId = request.nextUrl.searchParams.get('ticketId')
-    if (!ticketId) {
+    const raw = request.nextUrl.searchParams.get('ticketId')
+    if (!raw) {
       return NextResponse.json({ status: 'invalid', message: 'No ticket ID provided' })
     }
 
-    const guest = await fetchQuery(api.guests.getByTicketId, { ticket_id: ticketId.trim() }, { token })
+    const ticketId = extractTicketId(raw)
+
+    const guest = await fetchQuery(api.guests.getByTicketId, { ticket_id: ticketId }, { token })
 
     if (!guest) {
       return NextResponse.json({ status: 'invalid' })

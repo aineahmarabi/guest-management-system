@@ -4,19 +4,32 @@ import { fetchQuery, fetchMutation } from 'convex/nextjs'
 import { api } from '@/convex/_generated/api'
 import { sendEmail, buildCheckinConfirmationHtml } from '@/lib/email'
 
+function extractTicketId(raw: string): string {
+  const trimmed = raw.trim()
+  try {
+    const url = new URL(trimmed)
+    const parts = url.pathname.split('/')
+    return parts[parts.length - 1] || trimmed
+  } catch {
+    return trimmed
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const token = await convexAuthNextjsToken()
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { ticketId, eventId } = await request.json()
-    if (!ticketId) {
+    const { ticketId: rawTicketId, eventId } = await request.json()
+    if (!rawTicketId) {
       return NextResponse.json({ status: 'invalid', message: 'No ticket ID provided' }, { status: 400 })
     }
 
+    const ticketId = extractTicketId(rawTicketId)
+
     const guest = await fetchQuery(
       api.guests.getByTicketId,
-      { ticket_id: ticketId.trim(), ...(eventId ? { event_id: eventId } : {}) },
+      { ticket_id: ticketId, ...(eventId ? { event_id: eventId } : {}) },
       { token }
     )
 
