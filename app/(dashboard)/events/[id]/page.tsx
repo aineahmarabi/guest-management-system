@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import EditEventForm from './EditEventForm'
 import BulkEmailButton from './BulkEmailButton'
+import EventLiveStats from './EventLiveStats'
 import { Id } from '@/convex/_generated/dataModel'
 
 export default async function EventDetailPage({ params }: { params: { id: string } }) {
@@ -13,16 +14,6 @@ export default async function EventDetailPage({ params }: { params: { id: string
 
   const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
   if (!event) notFound()
-
-  const [counts, recentGuests] = await Promise.all([
-    fetchQuery(api.guests.countByEvent, { event_id: event._id }, { token }),
-    fetchQuery(api.guests.listByEvent, { event_id: event._id }, { token }),
-  ])
-
-  const total = counts.total
-  const checkedInCount = counts.checked_in
-  const pending = total - checkedInCount
-  const displayedGuests = recentGuests.slice(-5).reverse()
 
   const statusColor: Record<string, string> = {
     draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10 border-[#9CA3AF]/20',
@@ -59,19 +50,7 @@ export default async function EventDetailPage({ params }: { params: { id: string
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: 'Total Guests', value: total },
-          { label: 'Checked In', value: checkedInCount, accent: true },
-          { label: 'Pending', value: pending },
-          { label: 'Emails Sent', value: counts.email_sent },
-        ].map(stat => (
-          <div key={stat.label} className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] p-4">
-            <div className="text-[#9CA3AF] text-xs mb-1">{stat.label}</div>
-            <div className={`text-2xl font-semibold font-mono ${stat.accent ? 'text-[#16A34A]' : 'text-white'}`}>{stat.value}</div>
-          </div>
-        ))}
-      </div>
+      <EventLiveStats eventId={event._id} />
 
       <div className="flex flex-wrap gap-3 mb-8">
         <Link href={`/events/${params.id}/guests/new`} className="bg-[#800000] hover:bg-[#6B0000] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
@@ -80,58 +59,13 @@ export default async function EventDetailPage({ params }: { params: { id: string
         <Link href={`/events/${params.id}/guests`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           View All Guests
         </Link>
-        <BulkEmailButton eventId={params.id} guestCount={total} />
+        <BulkEmailButton eventId={params.id} />
         <Link href={`/events/${params.id}/checkin`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           Check-in Scanner
         </Link>
         <Link href={`/events/${params.id}/report`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           View Report
         </Link>
-      </div>
-
-      <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] mb-8">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
-          <h2 className="text-white font-medium text-sm">Recent Guests</h2>
-          <Link href={`/events/${params.id}/guests`} className="text-[#800000] text-xs hover:underline">View all</Link>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-[#2A2A2A]">
-                {['Name', 'Email', 'Ticket ID', 'Email Sent', 'Checked In'].map(h => (
-                  <th key={h} className="text-left text-xs text-[#9CA3AF] font-medium px-5 py-3 uppercase tracking-wider">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#2A2A2A]">
-              {displayedGuests.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="text-center text-[#9CA3AF] text-sm py-8">
-                    No guests yet.{' '}
-                    <Link href={`/events/${params.id}/guests/new`} className="text-[#800000] hover:underline">Add one</Link>
-                  </td>
-                </tr>
-              )}
-              {displayedGuests.map(guest => (
-                <tr key={guest._id} className="hover:bg-[#2A2A2A]/30 transition-colors">
-                  <td className="px-5 py-3 text-white text-sm">{guest.full_name}</td>
-                  <td className="px-5 py-3 text-[#9CA3AF] text-sm">{guest.email}</td>
-                  <td className="px-5 py-3 text-[#9CA3AF] text-xs font-mono">{guest.ticket_id}</td>
-                  <td className="px-5 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${guest.email_sent ? 'text-[#16A34A] bg-[#16A34A]/10' : 'text-[#9CA3AF] bg-[#2A2A2A]'}`}>
-                      {guest.email_sent ? 'Sent' : 'Pending'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${guest.checked_in ? 'text-[#16A34A] bg-[#16A34A]/10' : 'text-[#9CA3AF] bg-[#2A2A2A]'}`}>
-                      {guest.checked_in ? 'Yes' : 'No'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <EditEventForm event={event} />

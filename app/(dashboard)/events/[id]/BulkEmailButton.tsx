@@ -1,8 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
 
-export default function BulkEmailButton({ eventId, guestCount }: { eventId: string; guestCount: number }) {
+export default function BulkEmailButton({ eventId }: { eventId: string }) {
+  const counts = useQuery(api.guests.countByEvent, { event_id: eventId as Id<'events'> })
+  const guestCount = counts?.total ?? 0
+
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ sent: number; failed: number } | null>(null)
 

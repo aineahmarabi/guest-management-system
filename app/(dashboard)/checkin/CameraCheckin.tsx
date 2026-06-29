@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import jsQR from 'jsqr'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 
 interface LookupResult {
   status: 'found' | 'invalid'
@@ -42,18 +44,18 @@ export default function CameraCheckin() {
   const scanningRef = useRef(true)
   const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const startOfTodayEAT = useMemo(() => {
+    const now = new Date()
+    const eat = new Date(now.getTime() + 3 * 60 * 60 * 1000)
+    return new Date(Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth(), eat.getUTCDate())).toISOString()
+  }, [])
+
+  const checkedInToday = useQuery(api.guests.checkedInToday, { since: startOfTodayEAT }) ?? 0
+
   const [phase, setPhase] = useState<Phase>({ name: 'idle' })
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [hasCamera, setHasCamera] = useState(true)
-  const [checkedInToday, setCheckedInToday] = useState(0)
   const [started, setStarted] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/checkin/stats')
-      .then(r => r.json())
-      .then(d => { if (typeof d.checkedInToday === 'number') setCheckedInToday(d.checkedInToday) })
-      .catch(() => {})
-  }, [phase])
 
   useEffect(() => {
     if (!navigator.mediaDevices?.getUserMedia) setHasCamera(false)
@@ -131,7 +133,6 @@ export default function CameraCheckin() {
       const data: CheckinResult = await res.json()
 
       if (data.status === 'success') {
-        setCheckedInToday(prev => prev + 1)
         playSound('success')
       } else if (data.status === 'already_checked_in') {
         playSound('warning')

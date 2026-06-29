@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 
 interface ScanResult {
@@ -21,10 +23,13 @@ export default function CheckinScanner({
   initialTotal: number
   initialCheckedIn: number
 }) {
+  const liveCounts = useQuery(api.guests.countByEvent, { event_id: event._id })
+  const checkedIn = liveCounts?.checked_in ?? initialCheckedIn
+  const total = liveCounts?.total ?? initialTotal
+
   const [input, setInput] = useState('')
   const [result, setResult] = useState<ScanResult | null>(null)
   const [loading, setLoading] = useState(false)
-  const [checkedIn, setCheckedIn] = useState(initialCheckedIn)
   const inputRef = useRef<HTMLInputElement>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -91,7 +96,6 @@ export default function CheckinScanner({
     setInput('')
 
     if (data.status === 'success') {
-      setCheckedIn(prev => prev + 1)
       playSound('success')
     } else if (data.status === 'already_checked_in') {
       playSound('warning')
@@ -111,8 +115,8 @@ export default function CheckinScanner({
     }
   }
 
-  const pending = initialTotal - checkedIn
-  const rate = initialTotal > 0 ? Math.round((checkedIn / initialTotal) * 100) : 0
+  const pending = total - checkedIn
+  const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0
 
   const resultColors = {
     success: 'bg-[#16A34A] border-[#16A34A]',
@@ -147,7 +151,7 @@ export default function CheckinScanner({
           <div className="text-[#9CA3AF] text-xs mt-1 uppercase tracking-wider">Checked In</div>
         </div>
         <div className="px-6 py-4 text-center border-r border-[#2A2A2A]">
-          <div className="text-white text-3xl font-bold font-mono">{initialTotal}</div>
+          <div className="text-white text-3xl font-bold font-mono">{total}</div>
           <div className="text-[#9CA3AF] text-xs mt-1 uppercase tracking-wider">Total</div>
         </div>
         <div className="px-6 py-4 text-center">
