@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Doc } from '@/convex/_generated/dataModel'
+import DatePicker from '@/components/ui/DatePicker'
+import TimePicker from '@/components/ui/TimePicker'
 
 type Event = Doc<'events'>
 
@@ -78,11 +80,11 @@ export default function EditEventForm({ event }: { event: Event }) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-xs text-[#9CA3AF] mb-1.5">Date</label>
-            <input type="date" name="event_date" value={form.event_date} onChange={handleChange} required className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#800000] transition-colors" />
+            <DatePicker value={form.event_date} onChange={v => setForm(p => ({ ...p, event_date: v }))} />
           </div>
           <div>
             <label className="block text-xs text-[#9CA3AF] mb-1.5">Time</label>
-            <input type="time" name="event_time" value={form.event_time} onChange={handleChange} required className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#800000] transition-colors" />
+            <TimePicker value={form.event_time} onChange={v => setForm(p => ({ ...p, event_time: v }))} />
           </div>
           <div>
             <label className="block text-xs text-[#9CA3AF] mb-1.5">Status</label>

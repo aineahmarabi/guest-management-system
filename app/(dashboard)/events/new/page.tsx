@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useMutation, useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import Link from 'next/link'
+import DatePicker from '@/components/ui/DatePicker'
+import TimePicker from '@/components/ui/TimePicker'
 
 export default function NewEventPage() {
   const router = useRouter()
@@ -83,11 +85,11 @@ export default function NewEventPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-[#9CA3AF] mb-1.5">Date <span className="text-[#DC2626]">*</span></label>
-              <input type="date" name="event_date" value={form.event_date} onChange={handleChange} className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#800000] transition-colors" />
+              <DatePicker value={form.event_date} onChange={v => setForm(p => ({ ...p, event_date: v }))} placeholder="Pick a date" />
             </div>
             <div>
               <label className="block text-sm text-[#9CA3AF] mb-1.5">Time <span className="text-[#DC2626]">*</span></label>
-              <input type="time" name="event_time" value={form.event_time} onChange={handleChange} className="w-full bg-[#0D0D0D] border border-[#2A2A2A] rounded-[6px] px-3 py-2 text-white text-sm focus:outline-none focus:border-[#800000] transition-colors" />
+              <TimePicker value={form.event_time} onChange={v => setForm(p => ({ ...p, event_time: v }))} placeholder="Pick a time" />
             </div>
           </div>
           <div>
