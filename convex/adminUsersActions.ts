@@ -1,11 +1,12 @@
-"use node";
-
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import { createAccount, modifyAccountCredentials, retrieveAccount } from "@convex-dev/auth/server";
+import { createAccount } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { Scrypt } from "lucia";
 
 // Public action — called from Next.js API routes via fetchAction
+// Uses @convex-dev/auth's createAccount so hashing goes through auth:store mutation
+// (same path as signIn verification → guaranteed hash compatibility)
 export const createUser = action({
   args: {
     full_name: v.string(),
@@ -35,21 +36,10 @@ export const resetUserPassword = action({
   handler: async (ctx, { profileId, newPassword }) => {
     const profile = await ctx.runQuery(internal.adminUsers.getProfileForAction, { profileId });
     if (!profile) throw new Error("Profile not found");
-    await modifyAccountCredentials(ctx, {
-      provider: "password",
-      account: { id: profile.email, secret: newPassword },
-    });
-  },
-});
-
-// Convenience action — reset any account's password by email, callable via `npx convex run`
-export const resetPasswordByEmail = action({
-  args: { email: v.string(), newPassword: v.string() },
-  handler: async (ctx, { email, newPassword }) => {
-    await modifyAccountCredentials(ctx, {
-      provider: "password",
-      account: { id: email, secret: newPassword },
-    });
+    const account = await ctx.runQuery(internal.adminUsers.getAuthAccountSecret, { email: profile.email });
+    if (!account) throw new Error("Auth account not found");
+    const hash = await new Scrypt().hash(newPassword);
+    await ctx.runMutation(internal.adminUsers.updateAuthAccountSecret, { accountId: account.id, secret: hash });
   },
 });
 
@@ -59,14 +49,11 @@ export const changePassword = action({
   handler: async (ctx, { profileId, currentPassword, newPassword }) => {
     const profile = await ctx.runQuery(internal.adminUsers.getProfileForAction, { profileId });
     if (!profile) throw new Error("Profile not found");
-    // retrieveAccount throws if secret doesn't match — this verifies the current password
-    await retrieveAccount(ctx, {
-      provider: "password",
-      account: { id: profile.email, secret: currentPassword },
-    });
-    await modifyAccountCredentials(ctx, {
-      provider: "password",
-      account: { id: profile.email, secret: newPassword },
-    });
+    const account = await ctx.runQuery(internal.adminUsers.getAuthAccountSecret, { email: profile.email });
+    if (!account?.secret) throw new Error("Account not found");
+    const valid = await new Scrypt().verify(account.secret, currentPassword);
+    if (!valid) throw new Error("Current password is incorrect");
+    const newHash = await new Scrypt().hash(newPassword);
+    await ctx.runMutation(internal.adminUsers.updateAuthAccountSecret, { accountId: account.id, secret: newHash });
   },
 });

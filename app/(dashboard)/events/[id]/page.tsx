@@ -1,43 +1,34 @@
-'use client'
-
-import { useQuery } from 'convex/react'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
 import { api } from '@/convex/_generated/api'
-import { Id } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import EditEventForm from './EditEventForm'
 import BulkEmailButton from './BulkEmailButton'
+import { Id } from '@/convex/_generated/dataModel'
 
-const statusColor: Record<string, string> = {
-  draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10 border-[#9CA3AF]/20',
-  active: 'text-[#16A34A] bg-[#16A34A]/10 border-[#16A34A]/20',
-  completed: 'text-[#800000] bg-[#800000]/10 border-[#800000]/20',
-}
+export default async function EventDetailPage({ params }: { params: { id: string } }) {
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
 
-export default function EventDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const event = useQuery(api.events.getById, { id: id as Id<'events'> })
-  const counts = useQuery(api.guests.countByEvent, { event_id: id as Id<'events'> })
-  const allGuests = useQuery(api.guests.listByEvent, { event_id: id as Id<'events'> })
+  const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
+  if (!event) notFound()
 
-  if (event === undefined || counts === undefined || allGuests === undefined) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <div className="w-5 h-5 border-2 border-[#800000] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
-
-  if (event === null) {
-    return (
-      <div className="p-8 text-center text-[#9CA3AF]">Event not found.</div>
-    )
-  }
+  const [counts, recentGuests] = await Promise.all([
+    fetchQuery(api.guests.countByEvent, { event_id: event._id }, { token }),
+    fetchQuery(api.guests.listByEvent, { event_id: event._id }, { token }),
+  ])
 
   const total = counts.total
   const checkedInCount = counts.checked_in
   const pending = total - checkedInCount
-  const displayedGuests = allGuests.slice(-5).reverse()
+  const displayedGuests = recentGuests.slice(-5).reverse()
+
+  const statusColor: Record<string, string> = {
+    draft: 'text-[#9CA3AF] bg-[#9CA3AF]/10 border-[#9CA3AF]/20',
+    active: 'text-[#16A34A] bg-[#16A34A]/10 border-[#16A34A]/20',
+    completed: 'text-[#800000] bg-[#800000]/10 border-[#800000]/20',
+  }
 
   return (
     <div className="p-4 md:p-8">
@@ -83,17 +74,17 @@ export default function EventDetailPage() {
       </div>
 
       <div className="flex flex-wrap gap-3 mb-8">
-        <Link href={`/events/${id}/guests/new`} className="bg-[#800000] hover:bg-[#6B0000] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
+        <Link href={`/events/${params.id}/guests/new`} className="bg-[#800000] hover:bg-[#6B0000] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           + Add Guest
         </Link>
-        <Link href={`/events/${id}/guests`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
+        <Link href={`/events/${params.id}/guests`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           View All Guests
         </Link>
-        <BulkEmailButton eventId={id} guestCount={total} />
-        <Link href={`/events/${id}/checkin`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
+        <BulkEmailButton eventId={params.id} guestCount={total} />
+        <Link href={`/events/${params.id}/checkin`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           Check-in Scanner
         </Link>
-        <Link href={`/events/${id}/report`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
+        <Link href={`/events/${params.id}/report`} className="bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white text-sm font-medium px-4 py-2 rounded-[6px] transition-colors">
           View Report
         </Link>
       </div>
@@ -101,7 +92,7 @@ export default function EventDetailPage() {
       <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] mb-8">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2A2A2A]">
           <h2 className="text-white font-medium text-sm">Recent Guests</h2>
-          <Link href={`/events/${id}/guests`} className="text-[#800000] text-xs hover:underline">View all</Link>
+          <Link href={`/events/${params.id}/guests`} className="text-[#800000] text-xs hover:underline">View all</Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -117,7 +108,7 @@ export default function EventDetailPage() {
                 <tr>
                   <td colSpan={5} className="text-center text-[#9CA3AF] text-sm py-8">
                     No guests yet.{' '}
-                    <Link href={`/events/${id}/guests/new`} className="text-[#800000] hover:underline">Add one</Link>
+                    <Link href={`/events/${params.id}/guests/new`} className="text-[#800000] hover:underline">Add one</Link>
                   </td>
                 </tr>
               )}

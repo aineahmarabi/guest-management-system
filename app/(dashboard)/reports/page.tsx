@@ -5,6 +5,10 @@ import Link from 'next/link'
 import ReportsFilters from './ReportsFilters'
 import { Id } from '@/convex/_generated/dataModel'
 
+function nowInEAT() {
+  return new Date(new Date().getTime() + 3 * 60 * 60 * 1000)
+}
+
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -20,7 +24,7 @@ export default async function ReportsPage({
   const token = await convexAuthNextjsToken()
   if (!token) return null
 
-  const now = new Date()
+  const eat = nowInEAT()
   const period = searchParams.period ?? 'all_time'
 
   let startStr: string
@@ -30,13 +34,16 @@ export default async function ReportsPage({
     startStr = searchParams.dateFrom
     endStr = searchParams.dateTo
   } else if (period === 'this_month') {
-    startStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
-    endStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+    const firstOfMonth = new Date(Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth(), 1))
+    const lastOfMonth = new Date(Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth() + 1, 0))
+    startStr = firstOfMonth.toISOString().split('T')[0]
+    endStr = lastOfMonth.toISOString().split('T')[0]
   } else if (period === 'last_month') {
-    startStr = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
-    endStr = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0]
+    const firstOfLastMonth = new Date(Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth() - 1, 1))
+    const lastOfLastMonth = new Date(Date.UTC(eat.getUTCFullYear(), eat.getUTCMonth(), 0))
+    startStr = firstOfLastMonth.toISOString().split('T')[0]
+    endStr = lastOfLastMonth.toISOString().split('T')[0]
   } else {
-    // all_time — use a wide date range
     startStr = '2000-01-01'
     endStr = '2099-12-31'
   }
@@ -57,22 +64,30 @@ export default async function ReportsPage({
 
   const minRate = searchParams.minRate ? parseInt(searchParams.minRate) : 0
 
-  const allGuestArrays = await Promise.all(
-    filteredEvents.map(e => fetchQuery(api.guests.listByEventForReport, { event_id: e._id }, { token }))
-  )
+  const eventIds = filteredEvents.map(e => e._id)
+
+  const [allGuestArrays, emailLogCounts] = await Promise.all([
+    Promise.all(filteredEvents.map(e => fetchQuery(api.guests.listByEventForReport, { event_id: e._id }, { token }))),
+    eventIds.length > 0
+      ? fetchQuery(api.emailLogs.countsByEvents, { eventIds }, { token })
+      : Promise.resolve({} as Record<string, { sent: number; failed: number }>),
+  ])
 
   const eventRows = filteredEvents.map((event, i) => {
     const eventGuests = allGuestArrays[i]
     const attended = eventGuests.filter(g => g.checked_in).length
     const invites = eventGuests.length
     const eventRate = invites > 0 ? Math.round((attended / invites) * 100) : 0
-    return { event, eventGuests, attended, invites, eventRate }
+    const logs = emailLogCounts[event._id] ?? { sent: 0, failed: 0 }
+    const bounced = logs.failed
+    return { event, eventGuests, attended, invites, eventRate, bounced }
   }).filter(row => row.eventRate >= minRate)
 
   const filteredGuests = eventRows.flatMap(r => r.eventGuests)
   const totalEvents = eventRows.length
   const totalGuests = filteredGuests.length
   const totalCheckedIn = filteredGuests.filter(g => g.checked_in).length
+  const totalBounced = eventRows.reduce((sum, r) => sum + r.bounced, 0)
   const avgRate = totalGuests > 0 ? Math.round((totalCheckedIn / totalGuests) * 100) : 0
 
   const statusColor: Record<string, string> = {
@@ -114,16 +129,17 @@ export default async function ReportsPage({
         allEvents={allEventsForDropdown}
       />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         {[
           { label: 'Total Events', value: totalEvents },
           { label: 'Total Guests', value: totalGuests },
           { label: 'Total Checked In', value: totalCheckedIn },
+          { label: 'Bounced Emails', value: totalBounced, color: '#DC2626' },
           { label: 'Avg Attendance Rate', value: `${avgRate}%` },
         ].map(stat => (
           <div key={stat.label} className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] p-5">
             <div className="text-[#9CA3AF] text-sm mb-1">{stat.label}</div>
-            <div className="text-white text-3xl font-semibold font-mono">{stat.value}</div>
+            <div className="font-semibold font-mono text-3xl" style={{ color: stat.color ?? '#FFFFFF' }}>{stat.value}</div>
           </div>
         ))}
       </div>
@@ -136,7 +152,7 @@ export default async function ReportsPage({
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2A2A2A]">
-                {['Event', 'Date', 'Invites', 'Attended', 'Rate', 'Status'].map(h => (
+                {['Event', 'Date', 'Invites', 'Bounced', 'Attended', 'Rate', 'Status'].map(h => (
                   <th key={h} className="text-left text-xs text-[#9CA3AF] font-medium px-5 py-3.5 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -144,12 +160,12 @@ export default async function ReportsPage({
             <tbody className="divide-y divide-[#2A2A2A]">
               {eventRows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-[#9CA3AF] text-sm py-12">
+                  <td colSpan={7} className="text-center text-[#9CA3AF] text-sm py-12">
                     No events match the selected filters
                   </td>
                 </tr>
               )}
-              {eventRows.map(({ event, attended, invites, eventRate }) => (
+              {eventRows.map(({ event, attended, invites, eventRate, bounced }) => (
                 <tr key={event._id} className="hover:bg-[#2A2A2A]/30 transition-colors">
                   <td className="px-5 py-3.5">
                     <Link href={`/events/${event._id}/report`} className="text-white text-sm hover:text-[#800000] transition-colors font-medium">
@@ -160,6 +176,9 @@ export default async function ReportsPage({
                     {new Date(event.event_date).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td className="px-5 py-3.5 text-[#9CA3AF] text-sm font-mono">{invites}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={`text-sm font-mono ${bounced > 0 ? 'text-[#DC2626]' : 'text-[#9CA3AF]'}`}>{bounced}</span>
+                  </td>
                   <td className="px-5 py-3.5 text-[#9CA3AF] text-sm font-mono">{attended}</td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">

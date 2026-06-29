@@ -30,7 +30,7 @@ export default async function ScanPage({ params }: { params: { ticketId: string 
 
   if (guest.checked_in) {
     const checkedInTime = guest.checked_in_at
-      ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+      ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' })
       : '—'
 
     return (
@@ -51,7 +51,7 @@ export default async function ScanPage({ params }: { params: { ticketId: string 
 
   await fetchMutation(api.guests.checkIn, { id: guest._id }, { token })
   const checkedInAt = new Date().toISOString()
-  const checkedInTime = new Date(checkedInAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+  const checkedInTime = new Date(checkedInAt).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' })
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0D0D0D] p-4">

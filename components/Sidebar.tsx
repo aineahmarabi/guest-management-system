@@ -7,6 +7,13 @@ import { Doc } from '@/convex/_generated/dataModel'
 
 type Profile = Doc<'profiles'>
 
+const CameraIcon = ({ size = 20 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+)
+
 const navItems = [
   {
     label: 'Dashboard',
@@ -70,6 +77,12 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    label: 'Scanner',
+    href: '/checkin',
+    icon: <CameraIcon size={16} />,
+    mobileIcon: <CameraIcon size={20} />,
+  },
 ]
 
 const adminItems = [
@@ -90,13 +103,6 @@ const adminItems = [
     ),
   },
 ]
-
-const CameraIcon = ({ size = 20 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-    <circle cx="12" cy="13" r="4" />
-  </svg>
-)
 
 export default function Sidebar({ profile }: { profile: Profile }) {
   const pathname = usePathname()
@@ -159,7 +165,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
         </Link>
         <Link href="/checkin" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/checkin') ? '#800000' : '#9CA3AF' }}>
           <CameraIcon size={20} />
-          <span className="text-[10px] font-medium">Camera</span>
+          <span className="text-[10px] font-medium">Scanner</span>
         </Link>
         <Link href="/reports" className="flex-1 flex flex-col items-center justify-center gap-0.5 py-1" style={{ color: isActive('/reports') ? '#800000' : '#9CA3AF' }}>
           {navItems[2].mobileIcon}

@@ -82,16 +82,15 @@ export function buildCheckinConfirmationHtml(params: {
     <div class="body">
       <p>Dear <strong>${params.guestName}</strong>,</p>
       <div class="badge">✔ Attendance Confirmed</div>
-      <p>Your attendance at <strong>${params.eventName}</strong> has been successfully recorded.</p>
+      <p>Your attendance at <strong>${params.eventName}</strong> has been confirmed. We are glad to have you.</p>
       <div class="details">
         <p><strong>Event:</strong> ${params.eventName}</p>
         <p><strong>Date:</strong> ${params.eventDate}</p>
         <p><strong>Time:</strong> ${params.eventTime}</p>
         <p><strong>Venue:</strong> ${params.venue}</p>
-        <p><strong>Checked In:</strong> ${params.checkedInAt}</p>
+        <p><strong>Check-in Time:</strong> ${params.checkedInAt} EAT</p>
       </div>
       ${escortLine}
-      <p>Thank you for joining us. We hope you enjoy the event!</p>
       <p>Regards,<br><strong>Dualpix Communications Ltd</strong></p>
     </div>
     <div class="footer">

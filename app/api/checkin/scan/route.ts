@@ -9,16 +9,10 @@ export async function POST(request: NextRequest) {
     const token = await convexAuthNextjsToken()
     if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { ticketId: rawTicketId, eventId } = await request.json()
-    if (!rawTicketId) {
+    const { ticketId, eventId } = await request.json()
+    if (!ticketId) {
       return NextResponse.json({ status: 'invalid', message: 'No ticket ID provided' }, { status: 400 })
     }
-
-    // QR codes may encode a full URL (e.g. https://app.vercel.app/scan/TICKET-123).
-    // Extract the bare ticket ID if that's the case.
-    let ticketId: string = rawTicketId.trim()
-    const urlMatch = ticketId.match(/\/scan\/([^/?#\s]+)/)
-    if (urlMatch) ticketId = urlMatch[1]
 
     const guest = await fetchQuery(
       api.guests.getByTicketId,
@@ -51,7 +45,7 @@ export async function POST(request: NextRequest) {
           weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
         })
         const formattedTime = new Date(checkedInAt).toLocaleTimeString('en-KE', {
-          hour: '2-digit', minute: '2-digit',
+          hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi',
         })
         const html = buildCheckinConfirmationHtml({
           guestName: guest.full_name,
@@ -62,7 +56,7 @@ export async function POST(request: NextRequest) {
           checkedInAt: formattedTime,
           escortCount: guest.escort_count,
         })
-        sendEmail({ to: guest.email, toName: guest.full_name, subject: `Attendance Confirmed — ${event.name}`, html }).catch(() => {})
+        sendEmail({ to: guest.email, toName: guest.full_name, subject: `Welcome to ${event.name}`, html }).catch(() => {})
       })
       .catch(() => {})
 

@@ -12,20 +12,22 @@ export default async function EventReportPage({ params }: { params: { id: string
   const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
   if (!event) notFound()
 
-  const guests = await fetchQuery(api.guests.listByEventForReport, { event_id: event._id }, { token })
+  const [guests, bouncedCount] = await Promise.all([
+    fetchQuery(api.guests.listByEventForReport, { event_id: event._id }, { token }),
+    fetchQuery(api.emailLogs.countFailedByEvent, { event_id: event._id }, { token }),
+  ])
 
   const total = guests.length
   const checkedIn = guests.filter(g => g.checked_in).length
   const noShows = total - checkedIn
   const emailSent = guests.filter(g => g.email_sent).length
-  const totalEscorts = guests.filter(g => g.checked_in).reduce((sum, g) => sum + g.escort_count, 0)
   const rate = total > 0 ? Math.round((checkedIn / total) * 100) : 0
 
   const timeline: Record<string, number> = {}
   guests.forEach(g => {
     if (g.checked_in && g.checked_in_at) {
-      const hour = new Date(g.checked_in_at).getHours()
-      const label = `${String(hour).padStart(2, '0')}:00`
+      const eat = new Date(new Date(g.checked_in_at).getTime() + 3 * 60 * 60 * 1000)
+      const label = `${String(eat.getUTCHours()).padStart(2, '0')}:00`
       timeline[label] = (timeline[label] ?? 0) + 1
     }
   })
@@ -77,12 +79,13 @@ export default async function EventReportPage({ params }: { params: { id: string
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-6">
         {[
           { label: 'Invites Sent', value: emailSent },
-          { label: 'Checked In', value: checkedIn, color: '#16A34A' },
-          { label: 'No-shows', value: noShows, color: '#DC2626' },
-          { label: 'Escorts Admitted', value: totalEscorts },
+          { label: 'Delivered', value: emailSent - bouncedCount < 0 ? 0 : emailSent - bouncedCount },
+          { label: 'Bounced', value: bouncedCount, color: '#DC2626' },
+          { label: 'Attended', value: checkedIn, color: '#16A34A' },
+          { label: 'No-shows', value: noShows, color: '#D97706' },
           { label: 'Attendance Rate', value: `${rate}%`, color: '#800000' },
         ].map(stat => (
           <div key={stat.label} className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] p-4">
@@ -96,7 +99,7 @@ export default async function EventReportPage({ params }: { params: { id: string
 
       {timelineEntries.length > 0 && (
         <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] p-6 mb-6">
-          <h2 className="text-white font-medium text-sm mb-4">Check-in Timeline (Arrivals per Hour)</h2>
+          <h2 className="text-white font-medium text-sm mb-4">Check-in Timeline — EAT (Arrivals per Hour)</h2>
           <div className="flex items-end gap-2 h-24">
             {timelineEntries.map(([hour, count]) => (
               <div key={hour} className="flex flex-col items-center gap-1 flex-1">
@@ -117,7 +120,7 @@ export default async function EventReportPage({ params }: { params: { id: string
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2A2A2A]">
-                {['Name', 'Ticket ID', 'Email Sent', 'Checked In', 'Check-in Time', 'Escorts'].map(h => (
+                {['Name', 'Ticket ID', 'Email Sent', 'Checked In', 'Check-in Time (EAT)', 'Escorts'].map(h => (
                   <th key={h} className="text-left text-xs text-[#9CA3AF] font-medium px-5 py-3 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -141,7 +144,9 @@ export default async function EventReportPage({ params }: { params: { id: string
                     </span>
                   </td>
                   <td className="px-5 py-3 text-[#9CA3AF] text-xs font-mono">
-                    {guest.checked_in_at ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                    {guest.checked_in_at
+                      ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' })
+                      : '—'}
                   </td>
                   <td className="px-5 py-3 text-[#9CA3AF] text-sm font-mono text-center">{guest.escort_count}</td>
                 </tr>

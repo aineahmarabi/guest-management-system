@@ -1,36 +1,27 @@
-'use client'
-
-import { useQuery } from 'convex/react'
+import { convexAuthNextjsToken } from '@convex-dev/auth/nextjs/server'
+import { fetchQuery } from 'convex/nextjs'
 import { api } from '@/convex/_generated/api'
-import { Id } from '@/convex/_generated/dataModel'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import GuestActions from './GuestActions'
 import GuestListControls from './GuestListControls'
+import { Id } from '@/convex/_generated/dataModel'
 
-export default function GuestListPage() {
-  const { id } = useParams<{ id: string }>()
-  const event = useQuery(api.events.getById, { id: id as Id<'events'> })
-  const guests = useQuery(api.guests.listByEvent, { event_id: id as Id<'events'> })
+export default async function GuestListPage({ params }: { params: { id: string } }) {
+  const token = await convexAuthNextjsToken()
+  if (!token) return null
 
-  if (event === undefined || guests === undefined) {
-    return (
-      <div className="flex items-center justify-center h-48">
-        <div className="w-5 h-5 border-2 border-[#800000] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  const event = await fetchQuery(api.events.getById, { id: params.id as Id<'events'> }, { token })
+  if (!event) notFound()
 
-  if (event === null) {
-    return <div className="p-8 text-center text-[#9CA3AF]">Event not found.</div>
-  }
+  const guests = await fetchQuery(api.guests.listByEvent, { event_id: event._id }, { token })
 
   return (
     <div className="p-4 md:p-8">
       <div className="flex flex-wrap items-center gap-2 text-sm text-[#9CA3AF] mb-6">
         <Link href="/events" className="hover:text-white transition-colors px-1.5 py-0.5 rounded hover:bg-[#2A2A2A]">Events</Link>
         <span className="text-[#4B5563]">/</span>
-        <Link href={`/events/${id}`} className="hover:text-white transition-colors px-1.5 py-0.5 rounded hover:bg-[#2A2A2A] truncate max-w-[160px]">{event.name}</Link>
+        <Link href={`/events/${params.id}`} className="hover:text-white transition-colors px-1.5 py-0.5 rounded hover:bg-[#2A2A2A] truncate max-w-[160px]">{event.name}</Link>
         <span className="text-[#4B5563]">/</span>
         <span className="text-white px-1.5 py-0.5">Guests</span>
       </div>
@@ -40,7 +31,7 @@ export default function GuestListPage() {
           <h1 className="text-white text-2xl font-semibold">Guest List</h1>
           <p className="text-[#9CA3AF] text-sm mt-1">{guests.length} guests for {event.name}</p>
         </div>
-        <GuestListControls eventId={id} />
+        <GuestListControls eventId={params.id} />
       </div>
 
       <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-[6px] overflow-hidden">
@@ -58,7 +49,7 @@ export default function GuestListPage() {
                 <tr>
                   <td colSpan={7} className="text-center text-[#9CA3AF] text-sm py-12">
                     No guests yet.{' '}
-                    <Link href={`/events/${id}/guests/new`} className="text-[#800000] hover:underline">Add the first guest</Link>
+                    <Link href={`/events/${params.id}/guests/new`} className="text-[#800000] hover:underline">Add the first guest</Link>
                   </td>
                 </tr>
               )}
@@ -83,11 +74,11 @@ export default function GuestListPage() {
                   </td>
                   <td className="px-5 py-3.5 text-[#9CA3AF] text-xs font-mono">
                     {guest.checked_in_at
-                      ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' })
+                      ? new Date(guest.checked_in_at).toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' })
                       : '—'}
                   </td>
                   <td className="px-5 py-3.5">
-                    <GuestActions guest={guest} eventId={id} />
+                    <GuestActions guest={guest} eventId={params.id} />
                   </td>
                 </tr>
               ))}
