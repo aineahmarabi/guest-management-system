@@ -15,14 +15,16 @@ export default function GuestListLive({
   eventName: string
 }) {
   const guests = useQuery(api.guests.listByEvent, { event_id: eventId })
-  const list = guests ?? []
+  const loading = guests === undefined
 
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-3 mb-6 md:mb-8">
         <div>
           <h1 className="text-white text-2xl font-semibold">Guest List</h1>
-          <p className="text-[#9CA3AF] text-sm mt-1">{list.length} guests for {eventName}</p>
+          <p className="text-[#9CA3AF] text-sm mt-1">
+            {loading ? 'Loading…' : `${guests.length} guests for ${eventName}`}
+          </p>
         </div>
         <GuestListControls eventId={eventId} />
       </div>
@@ -38,7 +40,18 @@ export default function GuestListLive({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#2A2A2A]">
-              {list.length === 0 && (
+              {loading && Array.from({ length: 5 }, (_, i) => (
+                <tr key={i} className="animate-pulse">
+                  <td className="px-5 py-4"><div className="h-3 bg-[#2A2A2A] rounded w-32 mb-1" /><div className="h-2 bg-[#2A2A2A] rounded w-24" /></td>
+                  <td className="px-5 py-4"><div className="h-3 bg-[#2A2A2A] rounded w-28" /></td>
+                  <td className="px-5 py-4"><div className="h-3 bg-[#2A2A2A] rounded w-6 mx-auto" /></td>
+                  <td className="px-5 py-4"><div className="h-5 bg-[#2A2A2A] rounded-full w-14" /></td>
+                  <td className="px-5 py-4"><div className="h-5 bg-[#2A2A2A] rounded-full w-8" /></td>
+                  <td className="px-5 py-4"><div className="h-3 bg-[#2A2A2A] rounded w-12" /></td>
+                  <td className="px-5 py-4"><div className="h-3 bg-[#2A2A2A] rounded w-16" /></td>
+                </tr>
+              ))}
+              {!loading && guests.length === 0 && (
                 <tr>
                   <td colSpan={7} className="text-center text-[#9CA3AF] text-sm py-12">
                     No guests yet.{' '}
@@ -46,7 +59,7 @@ export default function GuestListLive({
                   </td>
                 </tr>
               )}
-              {list.map(guest => (
+              {!loading && guests.map(guest => (
                 <tr key={guest._id} className="hover:bg-[#2A2A2A]/30 transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="text-white text-sm font-medium">{guest.full_name}</div>

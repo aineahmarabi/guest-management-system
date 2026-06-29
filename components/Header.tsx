@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Doc } from '@/convex/_generated/dataModel'
+import GlobalSearch from './GlobalSearch'
 
 type Profile = Doc<'profiles'>
 
@@ -52,10 +53,11 @@ export default function Header({ profile }: { profile: Profile }) {
   }
 
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-4 md:px-6 h-14 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#2A2A2A]">
-      <h2 className="text-white font-semibold text-sm md:text-base">{title}</h2>
+    <header className="sticky top-0 z-40 flex items-center gap-4 px-4 md:px-6 h-14 bg-[#0D0D0D]/95 backdrop-blur-sm border-b border-[#2A2A2A]">
+      <h2 className="text-white font-semibold text-sm md:text-base shrink-0">{title}</h2>
+      <GlobalSearch />
 
-      <div className="relative" ref={menuRef}>
+      <div className="relative ml-auto" ref={menuRef}>
         <button
           onClick={() => setOpen(v => !v)}
           className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-[6px] hover:bg-[#1A1A1A] transition-colors"

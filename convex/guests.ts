@@ -97,8 +97,11 @@ export const countsByEvent = query({
 export const checkedInToday = query({
   args: { since: v.string() },
   handler: async (ctx, { since }) => {
-    const all = await ctx.db.query("guests").collect();
-    return all.filter(g => g.checked_in && g.checked_in_at && g.checked_in_at >= since).length;
+    const rows = await ctx.db
+      .query("guests")
+      .withIndex("by_checked_in_at", q => q.gte("checked_in_at", since))
+      .collect();
+    return rows.length;
   },
 });
 

@@ -29,7 +29,8 @@ export default defineSchema({
   })
     .index("by_date", ["event_date"])
     .index("by_status", ["status"])
-    .index("by_created_at", ["created_at"]),
+    .index("by_created_at", ["created_at"])
+    .searchIndex("search_events", { searchField: "name" }),
 
   guests: defineTable({
     event_id: v.id("events"),
@@ -48,7 +49,9 @@ export default defineSchema({
     .index("by_event_id", ["event_id"])
     .index("by_ticket_id", ["ticket_id"])
     .index("by_email", ["email"])
-    .index("by_created_at", ["created_at"]),
+    .index("by_created_at", ["created_at"])
+    .index("by_checked_in_at", ["checked_in_at"])
+    .searchIndex("search_guests", { searchField: "full_name" }),
 
   escorts: defineTable({
     guest_id: v.id("guests"),

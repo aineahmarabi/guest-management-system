@@ -18,6 +18,7 @@ import type * as guests from "../guests.js";
 import type * as http from "../http.js";
 import type * as orgSettings from "../orgSettings.js";
 import type * as profiles from "../profiles.js";
+import type * as search from "../search.js";
 
 import type {
   ApiFromModules,
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   orgSettings: typeof orgSettings;
   profiles: typeof profiles;
+  search: typeof search;
 }>;
 
 /**
